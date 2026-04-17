@@ -87,6 +87,24 @@ Then open http://127.0.0.1:5000.
 6. Keep `.env` out of git (already ignored) and commit only `.env.example` placeholders.
 7. Rotate all credentials if they were previously exposed.
 
+## Deploy To Render (Working Backend Link)
+
+GitHub Pages is static-only and cannot run this Flask + MySQL backend. Use Render for a real working web app URL.
+
+1. Push this repo to GitHub (already done).
+2. Open Render dashboard and create a new **Blueprint**.
+3. Select this repository; Render will detect `render.yaml` automatically.
+4. Set required environment variables in Render:
+	- `DATABASE_URL` (production MySQL URL)
+	- `SECRET_KEY`
+	- `SUPER_ADMIN_PASSWORD`
+	- `ADMIN_EMAIL`
+	- Mail settings (`MAIL_*`)
+	- reCAPTCHA keys
+	- `GROQ_API_KEY`
+5. Deploy. Render will build with `requirements.txt` and start with gunicorn.
+6. Use the generated `https://<service>.onrender.com` URL as your permanent working link.
+
 ## Chatbot Integration
 
 - Frontend widget files:
