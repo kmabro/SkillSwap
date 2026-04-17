@@ -1,0 +1,129 @@
+{% extends 'user/base.html' %}
+{% block content %}
+<section class="hero home-hero">
+    <div class="hero-logo">
+        <img class="hero-brand-logo" src="{{ url_for('static', filename='images/skillswap.svg') }}" alt="SkillSwap Logo">
+    </div>
+    <h1>Exchange Skills, Not Money</h1>
+    {# Optional subtitle alternatives are available from home_subtitle_options in the index route. #}
+    <p>Connect with learners and experts to share knowledge through peer-to-peer exchanges.</p>
+    <div class="inline-actions">
+        <a class="btn" href="{{ start_swapping_url }}">Start Swapping Skills</a>
+        <a class="btn secondary" href="{{ explore_matches_url }}">Explore Matches</a>
+    </div>
+</section>
+
+<section class="panel home-how-it-works">
+    <h2>How It Works</h2>
+    <div class="cards three-col home-info-cards">
+        <article class="card info-card">
+            <h3>1. Add Your Skills</h3>
+            <p>Share what you can teach and what you want to learn.</p>
+        </article>
+        <article class="card info-card">
+            <h3>2. Find Matches</h3>
+            <p>Discover users with skills that fit your learning goals.</p>
+        </article>
+        <article class="card info-card">
+            <h3>3. Exchange Knowledge</h3>
+            <p>Send requests, chat, complete exchanges, and leave ratings.</p>
+        </article>
+    </div>
+</section>
+
+<section class="panel home-popular-skills">
+    <h2>Popular Offered Skills</h2>
+    {% if top_skills %}
+        <ul class="skill-list">
+            {% for skill_name, count in top_skills[:10] %}
+                <li>{{ skill_name }} <span>{{ count }} users</span></li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No skills added yet<br>Be the first to share your skills!</p>
+        <a class="btn" href="{{ url_for('skills') }}">Add Skills</a>
+    {% endif %}
+</section>
+
+<section class="panel home-top-users">
+    <h2>Top Users</h2>
+    {% if top_user_cards %}
+        <div class="cards home-top-user-cards" id="topUsersList" data-authenticated="{{ '1' if g.user else '0' }}">
+            {% for card in top_user_cards %}
+                <article class="card top-user-card">
+                    <div class="top-user-header">
+                        <div class="top-user-avatar" aria-hidden="true">
+                            <img src="{{ url_for('static', filename=card.user.profile_image_path) }}" alt="{{ card.user.name }} avatar" loading="lazy" onerror="this.onerror=null;this.src='{{ url_for('static', filename='images/default-avatar.svg') }}';">
+                        </div>
+                        <div class="top-user-meta">
+                            <h3>{{ card.user.name }}</h3>
+                            <div class="top-user-subline">
+                                <span class="top-user-handle muted">@{{ card.user.username }}</span>
+                                <span class="top-user-status-pill">{{ card.user.availability_label }}</span>
+                                <span class="top-user-rating-line">★ {{ '%.1f'|format(card.avg_rating) }}</span>
+                            </div>
+                            <p class="top-user-location muted">{{ card.user.location or 'Location not set' }}</p>
+                        </div>
+                    </div>
+                    <div class="top-user-skills-wrap">
+                        <p>Skills Offered:</p>
+                        {% if card.skills %}
+                            {% for s in card.skills %}
+                                <span class="chip">{{ s }}</span>
+                            {% endfor %}
+                        {% else %}
+                            <span class="chip muted">No skills listed</span>
+                        {% endif %}
+                    </div>
+                    {% if g.user %}
+                        <a class="btn tiny secondary" href="{{ url_for('user_profile', username=card.user.username) }}">View Profile</a>
+                    {% endif %}
+                </article>
+            {% endfor %}
+        </div>
+        {% if top_users_total > 4 %}
+            <div class="top-users-actions">
+                <button
+                    class="btn secondary"
+                    id="topUsersViewMore"
+                    type="button"
+                    data-offset="4"
+                    data-limit="6"
+                    data-auth="{{ '1' if g.user else '0' }}"
+                >
+                    View More
+                </button>
+            </div>
+        {% endif %}
+    {% else %}
+        <div class="empty-state compact">
+            <p>No top users yet. Complete exchanges and ratings will appear here.</p>
+        </div>
+    {% endif %}
+</section>
+
+<section class="panel home-why-skillswap">
+    <h2>Why SkillSwap?</h2>
+    <div class="cards three-col home-why-cards">
+        <article class="card info-card">
+            <h3>No Money Required</h3>
+            <p>Swap skills directly without financial barriers.</p>
+        </article>
+        <article class="card info-card">
+            <h3>Learn from Real People</h3>
+            <p>Get practical knowledge from peers and professionals.</p>
+        </article>
+        <article class="card info-card">
+            <h3>Build Community</h3>
+            <p>Grow trusted connections through helpful exchanges.</p>
+        </article>
+    </div>
+</section>
+
+<section class="panel cta-footer home-cta-footer">
+    <h2>Start Swapping Skills Today</h2>
+    <p>Join the community and turn your skills into opportunities.</p>
+    <a class="btn" href="{{ explore_matches_url }}">Find Matches</a>
+</section>
+{% endblock %}
+

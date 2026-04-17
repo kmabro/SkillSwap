@@ -1,0 +1,58 @@
+{% extends 'admin/base_admin.html' %}
+{% block admin_content %}
+<section class="panel">
+    <div class="table-wrap">
+        <table>
+            <tbody>
+                <tr>
+                    <th>Session ID</th>
+                    <td>{{ session_row.session_id }}</td>
+                </tr>
+                <tr>
+                    <th>User</th>
+                    <td>
+                        <a href="{{ url_for('user_profile', username=session_row.user.username) }}" target="_blank" rel="noopener">@{{ session_row.user.username }}</a>
+                    </td>
+                </tr>
+                <tr>
+                    <th>IP Address</th>
+                    <td>{{ session_row.ip_address or '-' }}</td>
+                </tr>
+                <tr>
+                    <th>User Agent</th>
+                    <td>{{ session_row.user_agent or '-' }}</td>
+                </tr>
+                <tr>
+                    <th>Detected Device</th>
+                    <td>{{ summarize_user_agent(session_row.user_agent) }}</td>
+                </tr>
+                <tr>
+                    <th>Login Time</th>
+                    <td>{{ session_row.login_time.strftime('%Y-%m-%d %H:%M:%S') if session_row.login_time else '-' }}</td>
+                </tr>
+                <tr>
+                    <th>Last Active</th>
+                    <td>{{ session_row.last_active.strftime('%Y-%m-%d %H:%M:%S') if session_row.last_active else '-' }}</td>
+                </tr>
+                <tr>
+                    <th>Status</th>
+                    <td>
+                        <span class="badge {% if session_row.is_active %}status-active{% else %}status-blocked{% endif %}">
+                            {{ 'Active' if session_row.is_active else 'Inactive' }}
+                        </span>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="inline-actions" style="margin-top: 0.8rem;">
+        <a class="btn secondary" href="{{ url_for('admin_sessions_page') }}">Back</a>
+        {% if session_row.is_active %}
+            <form method="post" action="{{ url_for('admin_force_logout_session', session_id=session_row.session_id) }}" onsubmit="return confirm('Force logout this session?');">
+                <button class="btn danger" type="submit">Force Logout</button>
+            </form>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

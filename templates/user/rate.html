@@ -1,0 +1,24 @@
+{% extends 'user/base.html' %}
+{% block content %}
+<section class="panel small">
+    <h2>Rate {{ target_user.name }}</h2>
+    <p>Exchange: {{ req.offered_skill.skill_name }} for {{ req.requested_skill.skill_name }}</p>
+
+    <form method="post" class="form-grid">
+        <div>
+            <p class="rating-label">Rating</p>
+            <div class="star-rating" role="radiogroup" aria-label="Rate from 1 to 5 stars">
+                {% for val in [5, 4, 3, 2, 1] %}
+                    <input id="star-{{ val }}" type="radio" name="rating" value="{{ val }}" {% if val == 5 %}checked{% endif %} required>
+                    <label for="star-{{ val }}" title="{{ val }} star{{ '' if val == 1 else 's' }}">★</label>
+                {% endfor %}
+            </div>
+        </div>
+        <label>Feedback
+            <textarea name="feedback" rows="4" placeholder="Share your experience"></textarea>
+        </label>
+        <button class="btn" type="submit">Submit Feedback</button>
+    </form>
+</section>
+{% endblock %}
+

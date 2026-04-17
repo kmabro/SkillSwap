@@ -1,0 +1,258 @@
+{% extends 'admin/base_admin.html' %}
+{% block admin_content %}
+<section class="panel settings-stack">
+    <article class="setting-card">
+        <h3>Registration</h3>
+        <div class="setting-row">
+            <strong>New Registrations</strong>
+            <label class="switch">
+                <input type="checkbox" data-setting-key="ALLOW_NEW_REGISTRATIONS" {% if allow_new_registrations %}checked{% endif %}>
+                <span class="slider"></span>
+            </label>
+        </div>
+    </article>
+
+    <article class="setting-card">
+        <h3>Reporting</h3>
+        <div class="setting-row">
+            <strong>User Reports</strong>
+            <label class="switch">
+                <input type="checkbox" data-setting-key="ALLOW_USER_REPORTS" {% if allow_user_reports %}checked{% endif %}>
+                <span class="slider"></span>
+            </label>
+        </div>
+    </article>
+
+    <article class="setting-card">
+        <h3>Exchanges</h3>
+        <div class="setting-row">
+            <strong>Exchanges Enabled</strong>
+            <label class="switch">
+                <input type="checkbox" data-setting-key="ALLOW_SESSION_CREATION" {% if allow_session_creation %}checked{% endif %}>
+                <span class="slider"></span>
+            </label>
+        </div>
+        <div class="setting-row">
+            <strong>Auto Terminate Inactive Exchanges (1 Month)</strong>
+            <label class="switch">
+                <input type="checkbox" data-setting-key="AUTO_EXPIRE_INACTIVE_SESSIONS" {% if auto_expire_inactive_sessions %}checked{% endif %}>
+                <span class="slider"></span>
+            </label>
+        </div>
+    </article>
+
+    <article class="setting-card">
+        <h3>Feedback</h3>
+        <div class="setting-row">
+            <strong>Allow Ratings</strong>
+            <label class="switch">
+                <input type="checkbox" data-setting-key="ALLOW_RATING_AFTER_SESSION" {% if allow_rating_after_session %}checked{% endif %}>
+                <span class="slider"></span>
+            </label>
+        </div>
+        <div class="setting-row">
+            <strong>Require Feedback</strong>
+            <label class="switch">
+                <input type="checkbox" data-setting-key="REQUIRE_FEEDBACK_SUBMISSION" {% if require_feedback_submission %}checked{% endif %}>
+                <span class="slider"></span>
+            </label>
+        </div>
+    </article>
+
+    <article class="setting-card">
+        <h3>Data Export</h3>
+        <form id="exportForm" class="export-form" method="get" action="{{ url_for('admin_settings_export') }}">
+            <label>
+                <span>Type</span>
+                <select name="dataset" id="exportDataset" required>
+                    <option value="users">Users</option>
+                    <option value="skills">Skills</option>
+                    <option value="exchanges">Exchanges</option>
+                    <option value="reports">Reports</option>
+                    <option value="feedback">User Feedback</option>
+                    <option value="sessions">Sessions</option>
+                    <option value="activity_logs">Activity Logs</option>
+                </select>
+            </label>
+            <label>
+                <span>Format</span>
+                <select name="format" id="exportFormat" required>
+                    <option value="csv" selected>CSV</option>
+                    <option value="xlsx">Excel (.xlsx)</option>
+                    <option value="json">JSON</option>
+                </select>
+            </label>
+            <button class="btn" type="submit">Export</button>
+        </form>
+    </article>
+
+    <div id="settingsStatus" class="settings-status" hidden></div>
+</section>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    .settings-stack {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .setting-card {
+        border: 1px solid #dfe7e6;
+        border-radius: 12px;
+        padding: 1rem;
+        background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+    }
+
+    .setting-card h3 {
+        margin: 0 0 0.75rem;
+        font-size: 1rem;
+    }
+
+    .setting-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.8rem;
+        padding: 0.4rem 0;
+    }
+
+    .switch {
+        position: relative;
+        width: 52px;
+        height: 30px;
+        flex: 0 0 auto;
+    }
+
+    .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+        position: absolute;
+    }
+
+    .slider {
+        position: absolute;
+        inset: 0;
+        background: #d1d5db;
+        border-radius: 999px;
+        transition: background-color 0.2s ease;
+    }
+
+    .slider::before {
+        content: "";
+        position: absolute;
+        width: 22px;
+        height: 22px;
+        left: 4px;
+        top: 4px;
+        border-radius: 50%;
+        background: #fff;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.2);
+        transition: transform 0.2s ease;
+    }
+
+    .switch input:checked + .slider {
+        background: #7c3aed;
+    }
+
+    .switch input:checked + .slider::before {
+        transform: translateX(22px);
+    }
+
+    .export-form {
+        display: grid;
+        grid-template-columns: 1fr 1fr auto;
+        gap: 0.7rem;
+        align-items: end;
+    }
+
+    .export-form label {
+        display: grid;
+        gap: 0.35rem;
+    }
+
+    .export-form select {
+        height: 44px;
+        border-radius: 12px;
+        padding: 0 0.8rem;
+    }
+
+    .settings-status {
+        position: sticky;
+        bottom: 0.75rem;
+        justify-self: end;
+        padding: 0.45rem 0.7rem;
+        border-radius: 8px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #1e293b;
+        background: #ede9fe;
+        border: 1px solid #c4b5fd;
+    }
+
+    .settings-status.error {
+        color: #991b1b;
+        background: #fee2e2;
+        border-color: #fecaca;
+    }
+
+    @media (max-width: 900px) {
+        .export-form {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const statusEl = document.getElementById("settingsStatus");
+    const switchInputs = Array.from(document.querySelectorAll("input[type='checkbox'][data-setting-key]"));
+
+    let hideStatusTimer = null;
+
+    function showStatus(message, isError) {
+        statusEl.textContent = message;
+        statusEl.hidden = false;
+        statusEl.classList.toggle("error", Boolean(isError));
+
+        window.clearTimeout(hideStatusTimer);
+        hideStatusTimer = window.setTimeout(function () {
+            statusEl.hidden = true;
+            statusEl.classList.remove("error");
+        }, 1400);
+    }
+
+    async function updateSetting(key, value) {
+        try {
+            const response = await fetch("{{ url_for('admin_settings_update') }}", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-Requested-With": "XMLHttpRequest"
+                },
+                body: JSON.stringify({ key: key, value: value })
+            });
+            const payload = await response.json();
+            if (!response.ok || !payload.ok) {
+                throw new Error((payload && payload.message) || "Update failed");
+            }
+            showStatus("Updated", false);
+        } catch (error) {
+            showStatus(error.message || "Update failed", true);
+            throw error;
+        }
+    }
+
+    switchInputs.forEach(function (input) {
+        input.addEventListener("change", function () {
+            updateSetting(input.dataset.settingKey, input.checked).catch(function () {
+                input.checked = !input.checked;
+            });
+        });
+    });
+});
+</script>
+{% endblock %}

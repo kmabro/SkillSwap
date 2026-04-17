@@ -1,0 +1,64 @@
+{% extends 'user/base.html' %}
+{% block content %}
+<section class="panel small">
+    <h2>Create Account</h2>
+    {% if registration_notice %}
+    <div class="auth-inline-alert" role="status" aria-live="polite">
+        <span class="auth-inline-alert-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 9v4"></path>
+                <path d="M12 17h.01"></path>
+                <path d="M10.3 3.1 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.1a2 2 0 0 0-3.4 0z"></path>
+            </svg>
+        </span>
+        <span>{{ registration_notice }}</span>
+    </div>
+    {% endif %}
+    <form method="post" class="form-grid">
+        <label>Name
+            <input type="text" name="name" value="{{ form_data.name if form_data else '' }}" {% if not registrations_open %}disabled{% endif %} required>
+        </label>
+        <label>Username
+            <input type="text" name="username" value="{{ form_data.username if form_data else '' }}" {% if not registrations_open %}disabled{% endif %} required>
+        </label>
+        <label>Email
+            <input type="email" name="email" value="{{ form_data.email if form_data else '' }}" {% if not registrations_open %}disabled{% endif %} required>
+        </label>
+        <label>Password
+            <div class="password-field">
+                <input type="password" id="registerPassword" name="password" minlength="6" {% if not registrations_open %}disabled{% endif %} required>
+                <button type="button" class="password-toggle" data-target="registerPassword" aria-label="Show password" aria-pressed="false" {% if not registrations_open %}disabled{% endif %}>
+                    <svg class="password-icon-show" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+                        <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
+                    </svg>
+                    <svg class="password-icon-hide" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M3 3l18 18M10.6 10.7a3 3 0 004.2 4.2M9.9 5.2A11.9 11.9 0 0112 5c6.5 0 10 7 10 7a16.7 16.7 0 01-4.3 5.1M6.1 6.1C3.6 7.7 2 10 2 12c0 0 3.5 7 10 7 1.7 0 3.3-.4 4.7-1.1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                </button>
+            </div>
+        </label>
+        {% if registrations_open and recaptcha_enabled and not recaptcha_verified %}
+        <div class="g-recaptcha" data-sitekey="{{ recaptcha_site_key }}"></div>
+        {% elif registrations_open and recaptcha_enabled and recaptcha_verified %}
+        <div class="auth-inline-alert" role="status" aria-live="polite">
+            <span class="auth-inline-alert-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 6 9 17l-5-5"></path>
+                </svg>
+            </span>
+            <span>Captcha verified. You can continue registration without solving it again.</span>
+        </div>
+        {% endif %}
+        {% if registrations_open %}
+        <button class="btn" type="submit">Register</button>
+        {% else %}
+        <button class="btn secondary" type="button" disabled>Registrations Closed</button>
+        {% endif %}
+    </form>
+    {% if registrations_open and recaptcha_enabled and not recaptcha_verified %}
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+    {% endif %}
+</section>
+{% endblock %}
+

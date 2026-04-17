@@ -1,0 +1,420 @@
+{% extends 'admin/base_admin.html' %}
+{% block admin_content %}
+<section class="panel logs-toolbar-panel">
+    <div class="logs-filters-row">
+        <label class="field-wrap">
+            <span class="field-label">Event Type</span>
+            <select id="eventFilter" name="event" aria-label="Filter by Event">
+                <option value="all" {% if event_filter == 'all' %}selected{% endif %}>All Events</option>
+                <option value="user_registration" {% if event_filter == 'user_registration' %}selected{% endif %}>User Registration</option>
+                <option value="request_update" {% if event_filter == 'request_update' %}selected{% endif %}>Request Update</option>
+                <option value="user_report" {% if event_filter == 'user_report' %}selected{% endif %}>User Report</option>
+                <option value="feedback" {% if event_filter == 'feedback' %}selected{% endif %}>Feedback</option>
+            </select>
+        </label>
+
+        <label class="field-wrap">
+            <span class="field-label">Severity</span>
+            <select id="severityFilter" name="severity" aria-label="Filter by Severity">
+                <option value="all" {% if severity_filter == 'all' %}selected{% endif %}>All Levels</option>
+                <option value="info" {% if severity_filter == 'info' %}selected{% endif %}>Info</option>
+                <option value="success" {% if severity_filter == 'success' %}selected{% endif %}>Success</option>
+                <option value="warning" {% if severity_filter == 'warning' %}selected{% endif %}>Warning</option>
+                <option value="error" {% if severity_filter == 'error' %}selected{% endif %}>Error</option>
+            </select>
+        </label>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="table-wrap logs-table-wrap">
+        <table class="logs-table">
+            <thead>
+                <tr>
+                    <th>
+                        <span class="header-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="9"></circle>
+                                <path d="M12 7v5l3 2"></path>
+                            </svg>
+                        </span>
+                        Time
+                    </th>
+                    <th>Event</th>
+                    <th>Actor</th>
+                    <th>Details</th>
+                    <th class="col-severity">Severity</th>
+                </tr>
+            </thead>
+            <tbody id="logsTableBody"></tbody>
+        </table>
+    </div>
+
+    <div id="logsLoading" class="logs-loading" hidden>Loading more logs...</div>
+    <div id="logsEmpty" class="logs-empty" hidden>No logs found for the selected filters.</div>
+    <div id="logsScrollSentinel" class="logs-sentinel" aria-hidden="true"></div>
+</section>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    .logs-toolbar-panel {
+        display: grid;
+        gap: 0.75rem;
+    }
+
+    .logs-filters-row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.8rem;
+        width: 100%;
+    }
+
+    .field-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 0.28rem;
+        min-width: 0;
+        width: 100%;
+    }
+
+    .field-label {
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: #475569;
+        letter-spacing: 0.02em;
+    }
+
+    .logs-filters-row select {
+        height: 44px;
+        border: 1px solid #cbd5e1;
+        border-radius: 12px;
+        background: #fff;
+        padding: 0 0.8rem;
+        font-size: 0.9rem;
+        color: #0f172a;
+    }
+
+    .logs-filters-row select:focus {
+        outline: none;
+        border-color: #7c3aed;
+        box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.14);
+    }
+
+    .logs-table-wrap {
+        overflow: auto;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+    }
+
+    .logs-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        table-layout: auto;
+    }
+
+    .logs-table thead th {
+        text-align: left;
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: #475569;
+        background: #f8fafc;
+        padding: 0.72rem 0.82rem;
+        border-bottom: 1px solid #e2e8f0;
+        position: sticky;
+        top: 0;
+        z-index: 1;
+    }
+
+    .logs-table tbody td {
+        padding: 0.92rem 0.82rem;
+        border-bottom: 1px solid #eef2f7;
+        vertical-align: top;
+        color: #0f172a;
+        font-size: 0.9rem;
+        line-height: 1.45;
+    }
+
+    .logs-table tbody tr:hover {
+        background: #f8fbff;
+    }
+
+    .logs-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    .header-icon {
+        margin-right: 0.35rem;
+        vertical-align: -2px;
+        color: #64748b;
+    }
+
+    .event-cell {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        font-weight: 600;
+    }
+
+    .event-icon {
+        width: 1rem;
+        height: 1rem;
+        color: #475569;
+        flex: 0 0 auto;
+    }
+
+    .actor-with-arrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        flex-wrap: wrap;
+    }
+
+    .arrow-icon {
+        width: 0.9rem;
+        height: 0.9rem;
+        color: #64748b;
+        flex: 0 0 auto;
+    }
+
+    .details-cell {
+        color: #334155;
+        word-break: break-word;
+    }
+
+    .col-severity,
+    .severity-cell {
+        text-align: left;
+        white-space: nowrap;
+        width: 1%;
+    }
+
+    .severity-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: flex-start;
+        min-width: 74px;
+        height: 26px;
+        padding: 0 0.56rem;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: capitalize;
+        width: fit-content;
+    }
+
+    .actor-link {
+        color: #0f766e;
+        font-weight: 700;
+        text-decoration: none;
+        text-underline-offset: 2px;
+    }
+
+    .actor-link:hover {
+        color: #7c3aed;
+        text-decoration: underline;
+    }
+
+    .severity-info {
+        color: #1d4ed8;
+        background: #dbeafe;
+    }
+
+    .severity-success {
+        color: #166534;
+        background: #dcfce7;
+    }
+
+    .severity-warning {
+        color: #9a3412;
+        background: #ffedd5;
+    }
+
+    .severity-error {
+        color: #991b1b;
+        background: #fee2e2;
+    }
+
+    .logs-loading,
+    .logs-empty {
+        text-align: center;
+        padding: 0.9rem 0.5rem 0.15rem;
+        color: #64748b;
+        font-size: 0.88rem;
+    }
+
+    .logs-sentinel {
+        height: 1px;
+    }
+
+    @media (max-width: 900px) {
+        .logs-filters-row {
+            grid-template-columns: 1fr;
+        }
+
+        .logs-table {
+            min-width: 860px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const tbody = document.getElementById("logsTableBody");
+    const sentinel = document.getElementById("logsScrollSentinel");
+    const loadingEl = document.getElementById("logsLoading");
+    const emptyEl = document.getElementById("logsEmpty");
+    const eventFilter = document.getElementById("eventFilter");
+    const severityFilter = document.getElementById("severityFilter");
+
+    const state = {
+        offset: 0,
+        limit: 25,
+        hasMore: true,
+        loading: false
+    };
+
+    const EVENT_ICONS = {
+        user_registration: "<svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2\"></path><circle cx=\"12\" cy=\"7\" r=\"4\"></circle></svg>",
+        request_update: "<svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><polyline points=\"23 4 23 10 17 10\"></polyline><polyline points=\"1 20 1 14 7 14\"></polyline><path d=\"M3.51 9a9 9 0 0 1 14.13-3.36L23 10M1 14l5.36 4.36A9 9 0 0 0 20.49 15\"></path></svg>",
+        user_report: "<svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z\"></path><line x1=\"12\" y1=\"9\" x2=\"12\" y2=\"13\"></line><line x1=\"12\" y1=\"17\" x2=\"12.01\" y2=\"17\"></line></svg>",
+        feedback: "<svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"></path></svg>"
+    };
+
+    const RIGHT_ARROW_ICON = "<svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><line x1=\"5\" y1=\"12\" x2=\"19\" y2=\"12\"></line><polyline points=\"12 5 19 12 12 19\"></polyline></svg>";
+
+    function escapeHtml(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/\"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function eventIconSvg(eventKey) {
+        return EVENT_ICONS[eventKey] || "<svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><circle cx=\"12\" cy=\"12\" r=\"3\"></circle></svg>";
+    }
+
+    function actorProfileUrl(actorValue) {
+        const raw = String(actorValue || "").trim();
+        if (!raw || raw === "Unknown") return "";
+        const username = raw.startsWith("@") ? raw.slice(1) : raw;
+        if (!username) return "";
+        return "{{ url_for('user_profile', username='__USERNAME__') }}".replace("__USERNAME__", encodeURIComponent(username));
+    }
+
+    function buildActorLink(actorValue) {
+        const href = actorProfileUrl(actorValue);
+        const label = String(actorValue || "Unknown").trim() || "Unknown";
+        if (!href) {
+            return escapeHtml(label);
+        }
+        return "<a class=\"actor-link\" href=\"" + href + "\">" + escapeHtml(label) + "</a>";
+    }
+
+    function buildActorCell(row) {
+        if (row.event_key === "request_update" && row.actor_from && row.actor_to) {
+            return "<span class=\"actor-with-arrow\">"
+                + "<span>" + buildActorLink(row.actor_from) + "</span>"
+                + "<span class=\"arrow-icon\" aria-hidden=\"true\">" + RIGHT_ARROW_ICON + "</span>"
+                + "<span>" + buildActorLink(row.actor_to) + "</span>"
+                + "</span>";
+        }
+        return buildActorLink(row.actor);
+    }
+
+    function buildRow(row) {
+        const tr = document.createElement("tr");
+        const severityClass = "severity-" + (row.severity || "info").toLowerCase();
+
+        tr.innerHTML = ""
+            + "<td>" + escapeHtml(row.time) + "</td>"
+            + "<td><span class=\"event-cell\"><span class=\"event-icon\" aria-hidden=\"true\">" + eventIconSvg(row.event_key) + "</span>" + escapeHtml(row.event) + "</span></td>"
+            + "<td>" + buildActorCell(row) + "</td>"
+            + "<td class=\"details-cell\">" + escapeHtml(row.details) + "</td>"
+            + "<td class=\"severity-cell\"><span class=\"severity-badge " + severityClass + "\">" + escapeHtml(row.severity) + "</span></td>";
+
+        return tr;
+    }
+
+    function queryString() {
+        const params = new URLSearchParams();
+        params.set("event", eventFilter.value || "all");
+        params.set("severity", severityFilter.value || "all");
+        params.set("offset", String(state.offset));
+        params.set("limit", String(state.limit));
+        return params.toString();
+    }
+
+    async function loadLogs(reset) {
+        if (state.loading) return;
+        if (!state.hasMore && !reset) return;
+
+        state.loading = true;
+        loadingEl.hidden = false;
+        emptyEl.hidden = true;
+
+        if (reset) {
+            state.offset = 0;
+            state.hasMore = true;
+            tbody.innerHTML = "";
+        }
+
+        try {
+            const response = await fetch("{{ url_for('admin_activity_logs_data') }}?" + queryString(), {
+                headers: { "X-Requested-With": "XMLHttpRequest" }
+            });
+            if (!response.ok) {
+                throw new Error("Failed to load logs");
+            }
+
+            const payload = await response.json();
+            const rows = Array.isArray(payload.rows) ? payload.rows : [];
+
+            rows.forEach(function (row) {
+                tbody.appendChild(buildRow(row));
+            });
+
+            state.offset += rows.length;
+            state.hasMore = Boolean(payload.has_more);
+
+            if (tbody.children.length === 0) {
+                emptyEl.hidden = false;
+            }
+        } catch (error) {
+            if (tbody.children.length === 0) {
+                emptyEl.textContent = "Unable to load logs right now.";
+                emptyEl.hidden = false;
+            }
+        } finally {
+            loadingEl.hidden = true;
+            state.loading = false;
+        }
+    }
+
+    function applyFilters() {
+        loadLogs(true);
+    }
+
+    eventFilter.addEventListener("change", applyFilters);
+    severityFilter.addEventListener("change", applyFilters);
+
+    const observer = new IntersectionObserver(function (entries) {
+        if (entries.some(function (entry) { return entry.isIntersecting; })) {
+            loadLogs(false);
+        }
+    }, {
+        root: null,
+        rootMargin: "300px",
+        threshold: 0
+    });
+
+    observer.observe(sentinel);
+    loadLogs(true);
+});
+</script>
+{% endblock %}

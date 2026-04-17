@@ -1,0 +1,385 @@
+{% extends 'user/base.html' %}
+{% block content %}
+<section class="panel search-panel" id="globalSearchPanel" data-search-endpoint="{{ url_for('search') }}">
+    <h2 class="search-title">Search</h2>
+
+    <form class="search-shell" id="globalSearchForm" method="get" autocomplete="off">
+        <div class="search-input-wrap">
+            <input
+                id="globalSearchInput"
+                type="text"
+                name="q"
+                value="{{ query_text }}"
+                placeholder="Search people to exchange skills with..."
+                spellcheck="false"
+            >
+            <button type="button" id="searchClearBtn" class="search-clear-btn hidden" aria-label="Clear search">x</button>
+        </div>
+    </form>
+
+    <p id="searchInlineLoader" class="search-inline-loader hidden">Searching...</p>
+
+    <div id="searchResultsWrap" class="search-results-wrap">
+        <div id="searchResultsGrid" class="cards matches-grid">
+            {% for row in result_rows %}
+                <article class="card match-card search-card">
+                    <div class="match-card-top">
+                        <div class="match-user-block">
+                            <div class="match-avatar" aria-hidden="true">
+                                <img
+                                    src="{{ url_for('static', filename=row.user.profile_image_path) }}"
+                                    alt="@{{ row.user.username }} avatar"
+                                    loading="lazy"
+                                    onerror="this.onerror=null;this.src='{{ url_for('static', filename='images/default-avatar.svg') }}';"
+                                >
+                            </div>
+                            <div class="match-user-meta">
+                                <p class="match-user-name">{{ row.user.name }}</p>
+                                <p class="match-user-sub">
+                                    <a class="user-handle-link" href="{{ url_for('user_profile', username=row.user.username) }}">@{{ row.user.username }}</a>
+                                    <span class="availability-badge availability-{{ row.user.availability_label|lower }}">{{ row.user.availability_label }}</span>
+                                    {% if row.avg_rating is not none %}
+                                        <span class="match-user-rating-inline">
+                                            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
+                                                <path d="M12 2.5l2.9 5.88 6.49.94-4.7 4.58 1.11 6.47L12 17.31 6.2 20.37l1.11-6.47-4.7-4.58 6.49-.94L12 2.5z"></path>
+                                            </svg>
+                                            <span>{{ row.avg_rating }}</span>
+                                        </span>
+                                    {% endif %}
+                                </p>
+                                {% if row.location %}
+                                    <p class="search-location">{{ row.location }}</p>
+                                {% else %}
+                                    <p class="search-location">Location not specified</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% if row.strength and row.strength > 0 %}
+                            <button
+                                type="button"
+                                class="match-strength-badge search-match-badge"
+                                data-username="{{ row.user.username }}"
+                                aria-label="Open match actions for @{{ row.user.username }}"
+                            >{{ row.strength }}% Match</button>
+                        {% endif %}
+                    </div>
+
+                    <div class="search-skill-section">
+                        <p class="search-skill-label">Offers</p>
+                        <div class="search-skill-chip-wrap">
+                            {% if row.offered_skills %}
+                                {% for skill in row.offered_skills %}
+                                    <span class="chip">{{ skill.name }}</span>
+                                {% endfor %}
+                            {% else %}
+                                <span class="muted">No offered skills listed.</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="search-skill-section">
+                        <p class="search-skill-label">Wants</p>
+                        <div class="search-skill-chip-wrap">
+                            {% if row.wanted_skills %}
+                                {% for skill in row.wanted_skills %}
+                                    <span class="chip">{{ skill.name }}</span>
+                                {% endfor %}
+                            {% else %}
+                                <span class="muted">No wanted skills listed.</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="inline-actions match-actions">
+                        <a class="btn secondary" href="{{ url_for('user_profile', username=row.user.username) }}">View Profile</a>
+                        <a class="btn tertiary" href="{{ url_for('messages_thread', username=row.user.username) }}">Chat</a>
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+
+        <div id="searchEmptyState" class="empty-state {% if result_rows %}hidden{% endif %}">
+            {% if has_active_search %}
+                <p>No results found</p>
+            {% else %}
+                <p>Search by name, username, skill, or category to see matching users.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <dialog id="searchMatchModal" class="match-modal">
+        <form method="dialog" class="match-modal-close-form">
+            <button type="submit" class="match-modal-close" aria-label="Close">x</button>
+        </form>
+        <h3 id="matchModalTitle">Match</h3>
+        <form id="matchModalRequestForm" method="post" class="form-grid match-modal-form">
+            <label>Your Offered Skill
+                <select name="offered_skill_id" id="matchModalOfferedSelect" required></select>
+            </label>
+            <label>Requested Skill
+                <select name="requested_skill_id" id="matchModalRequestedSelect" required></select>
+            </label>
+            <div class="inline-actions match-actions">
+                <button class="btn" id="matchModalRequestBtn" type="submit">Request Exchange</button>
+            </div>
+            <p class="muted hidden" id="matchModalHint">No direct exchange pair available right now.</p>
+        </form>
+    </dialog>
+
+    <script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const initialRows = {{ initial_rows | tojson }};
+        const panel = document.getElementById("globalSearchPanel");
+        const form = document.getElementById("globalSearchForm");
+        const input = document.getElementById("globalSearchInput");
+        const resultsGrid = document.getElementById("searchResultsGrid");
+        const emptyState = document.getElementById("searchEmptyState");
+        const inlineLoader = document.getElementById("searchInlineLoader");
+        const clearBtn = document.getElementById("searchClearBtn");
+        const matchModal = document.getElementById("searchMatchModal");
+        const matchModalTitle = document.getElementById("matchModalTitle");
+        const matchModalRequestForm = document.getElementById("matchModalRequestForm");
+        const matchModalOfferedSelect = document.getElementById("matchModalOfferedSelect");
+        const matchModalRequestedSelect = document.getElementById("matchModalRequestedSelect");
+        const matchModalRequestBtn = document.getElementById("matchModalRequestBtn");
+        const matchModalHint = document.getElementById("matchModalHint");
+        const endpoint = panel ? panel.dataset.searchEndpoint : "";
+
+        if (!form || !input || !resultsGrid || !endpoint) {
+            return;
+        }
+
+        let latestRows = Array.isArray(initialRows) ? initialRows : [];
+        let debounceTimer = null;
+        let activeRequestId = 0;
+
+        const escapeHtml = (value) => {
+            const map = {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"};
+            return String(value || "").replace(/[&<>"']/g, (ch) => map[ch]);
+        };
+
+        const highlight = (value, keyword) => {
+            const safeText = escapeHtml(value);
+            const trimmed = (keyword || "").trim();
+            if (!trimmed) {
+                return safeText;
+            }
+            const escapedKeyword = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            return safeText.replace(new RegExp(`(${escapedKeyword})`, "ig"), "<mark>$1</mark>");
+        };
+
+        const renderSkillChips = (skills, keyword, emptyText) => {
+            if (!skills || !skills.length) {
+                return `<span class="muted">${escapeHtml(emptyText)}</span>`;
+            }
+            return skills.map((skill) => `<span class="chip">${highlight(skill.name, keyword)}</span>`).join("");
+        };
+
+        const renderCard = (row, keyword) => {
+            const rating = row.avg_rating !== null && row.avg_rating !== undefined
+                ? `<span class="match-user-rating-inline"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 2.5l2.9 5.88 6.49.94-4.7 4.58 1.11 6.47L12 17.31 6.2 20.37l1.11-6.47-4.7-4.58 6.49-.94L12 2.5z"></path></svg><span>${escapeHtml(row.avg_rating)}</span></span>`
+                : "";
+            const availabilityClass = (row.availability_label || "available").toLowerCase();
+            const location = row.location
+                ? `<p class="search-location">${highlight(row.location, keyword)}</p>`
+                : '<p class="search-location">Location not specified</p>';
+            const matchBadge = row.strength && row.strength > 0
+                ? `<button type="button" class="match-strength-badge search-match-badge" data-username="${escapeHtml(row.username)}">${escapeHtml(row.strength)}% Match</button>`
+                : "";
+
+            return `
+                <article class="card match-card search-card">
+                    <div class="match-card-top">
+                        <div class="match-user-block">
+                            <div class="match-avatar" aria-hidden="true">
+                                <img src="${escapeHtml(row.profile_image)}" alt="@${escapeHtml(row.username)} avatar" loading="lazy" onerror="this.onerror=null;this.src='{{ url_for('static', filename='images/default-avatar.svg') }}';">
+                            </div>
+                            <div class="match-user-meta">
+                                <p class="match-user-name">${highlight(row.name, keyword)}</p>
+                                <p class="match-user-sub">
+                                    <a class="user-handle-link" href="${escapeHtml(row.profile_url)}">@${highlight(row.username, keyword)}</a>
+                                    <span class="availability-badge availability-${escapeHtml(availabilityClass)}">${escapeHtml(row.availability_label || "Available")}</span>
+                                    ${rating}
+                                </p>
+                                ${location}
+                            </div>
+                        </div>
+                        ${matchBadge}
+                    </div>
+
+                    <div class="search-skill-section">
+                        <p class="search-skill-label">Offers</p>
+                        <div class="search-skill-chip-wrap">${renderSkillChips(row.offered_skills, keyword, "No offered skills listed.")}</div>
+                    </div>
+
+                    <div class="search-skill-section">
+                        <p class="search-skill-label">Wants</p>
+                        <div class="search-skill-chip-wrap">${renderSkillChips(row.wanted_skills, keyword, "No wanted skills listed.")}</div>
+                    </div>
+
+                    <div class="inline-actions match-actions"><a class="btn secondary" href="${escapeHtml(row.profile_url)}">View Profile</a><a class="btn tertiary" href="${escapeHtml(row.message_url)}">Chat</a></div>
+                </article>
+            `;
+        };
+
+        const setSelectOptions = (selectEl, options, selectedId) => {
+            const items = Array.isArray(options) ? options : [];
+            selectEl.innerHTML = items.map((item) => {
+                const selected = Number(item.id) === Number(selectedId) ? " selected" : "";
+                return `<option value="${escapeHtml(item.id)}"${selected}>${escapeHtml(item.name)}</option>`;
+            }).join("");
+        };
+
+        const syncClearButton = () => {
+            if (!clearBtn) {
+                return;
+            }
+            clearBtn.classList.toggle("hidden", !input.value.trim());
+        };
+
+        const openMatchModal = (username) => {
+            if (!matchModal) {
+                return;
+            }
+            const row = latestRows.find((item) => item.username === username);
+            if (!row) {
+                return;
+            }
+
+            matchModalTitle.textContent = `${row.strength || 0}% Match with @${row.username}`;
+            matchModalRequestForm.setAttribute("action", row.request_url || "#");
+
+            setSelectOptions(matchModalOfferedSelect, row.offered_options || [], row.default_offered_skill_id);
+            setSelectOptions(matchModalRequestedSelect, row.requested_options || [], row.default_requested_skill_id);
+
+            const canRequest = Boolean(
+                row.request_enabled
+                && row.request_url
+                && (row.offered_options || []).length
+                && (row.requested_options || []).length
+            );
+            matchModalRequestBtn.disabled = !canRequest;
+            matchModalRequestBtn.setAttribute("aria-disabled", canRequest ? "false" : "true");
+            matchModalHint.classList.toggle("hidden", canRequest);
+
+            if (typeof matchModal.showModal === "function") {
+                matchModal.showModal();
+            }
+        };
+
+        const updateUrl = () => {
+            const params = new URLSearchParams();
+            if (input.value.trim()) {
+                params.set("q", input.value.trim());
+            }
+            const query = params.toString();
+            const nextUrl = query ? `${endpoint}?${query}` : endpoint;
+            window.history.replaceState({}, "", nextUrl);
+        };
+
+        const runSearch = async () => {
+            const requestId = ++activeRequestId;
+            const q = input.value.trim();
+            const params = new URLSearchParams({ajax: "1", q});
+
+            inlineLoader.classList.remove("hidden");
+            try {
+                const response = await fetch(`${endpoint}?${params.toString()}`, {
+                    headers: {"X-Requested-With": "XMLHttpRequest"}
+                });
+                if (!response.ok) {
+                    throw new Error("Search failed");
+                }
+
+                const data = await response.json();
+                if (requestId !== activeRequestId) {
+                    return;
+                }
+
+                const rows = Array.isArray(data.results) ? data.results : [];
+                latestRows = rows;
+                resultsGrid.innerHTML = rows.map((row) => renderCard(row, q)).join("");
+
+                if (!rows.length) {
+                    emptyState.classList.remove("hidden");
+                    emptyState.innerHTML = q
+                        ? "<p>No results found</p>"
+                        : "<p>Search by name, username, skill, or category to see matching users.</p>";
+                } else {
+                    emptyState.classList.add("hidden");
+                }
+
+                updateUrl();
+                syncClearButton();
+            } catch (_err) {
+                if (requestId !== activeRequestId) {
+                    return;
+                }
+                latestRows = [];
+                resultsGrid.innerHTML = "";
+                emptyState.classList.remove("hidden");
+                emptyState.innerHTML = "<p>No results found</p>";
+                syncClearButton();
+            } finally {
+                if (requestId === activeRequestId) {
+                    inlineLoader.classList.add("hidden");
+                }
+            }
+        };
+
+        const queueSearch = () => {
+            window.clearTimeout(debounceTimer);
+            debounceTimer = window.setTimeout(runSearch, 320);
+        };
+
+        input.addEventListener("input", queueSearch);
+        form.addEventListener("submit", function (event) {
+            event.preventDefault();
+            runSearch();
+        });
+
+        if (clearBtn) {
+            clearBtn.addEventListener("click", function () {
+                input.value = "";
+                syncClearButton();
+                runSearch();
+                input.focus();
+            });
+        }
+
+        panel.addEventListener("click", function (event) {
+            const badge = event.target.closest(".search-match-badge");
+            if (!badge) {
+                return;
+            }
+            event.preventDefault();
+            const username = badge.getAttribute("data-username") || "";
+            if (username) {
+                openMatchModal(username);
+            }
+        });
+
+        if (matchModal) {
+            matchModal.addEventListener("click", function (event) {
+                const rect = matchModal.getBoundingClientRect();
+                const inside = (
+                    event.clientX >= rect.left
+                    && event.clientX <= rect.right
+                    && event.clientY >= rect.top
+                    && event.clientY <= rect.bottom
+                );
+                if (!inside) {
+                    matchModal.close();
+                }
+            });
+        }
+
+        if (input.value.trim()) {
+            runSearch();
+        }
+        syncClearButton();
+    });
+    </script>
+</section>
+{% endblock %}
+

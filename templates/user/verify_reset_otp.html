@@ -1,0 +1,14 @@
+{% extends 'user/base.html' %}
+{% block content %}
+<section class="panel small">
+    <h2>Verify Reset OTP</h2>
+    <p class="muted">We sent a 6-character password reset OTP to {{ pending_email }}. Enter it below to continue.</p>
+    <form method="post" class="form-grid verify-otp-form">
+        <label>OTP Code
+            <input type="text" name="otp" maxlength="6" pattern="[A-Za-z0-9]{6}" inputmode="text" placeholder="Enter 6-character OTP" required>
+        </label>
+        <button class="btn" type="submit">Verify OTP</button>
+    </form>
+</section>
+{% endblock %}
+

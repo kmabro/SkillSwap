@@ -1,0 +1,35 @@
+{% extends 'admin/base_admin.html' %}
+{% block admin_content %}
+<section class="panel">
+    <div class="stats">
+        <article>
+            <h3>{{ analytics.pending_requests }}</h3>
+            <p>Pending Requests</p>
+        </article>
+        <article>
+            <h3>{{ analytics.total_exchanges }}</h3>
+            <p>Total Exchanges</p>
+        </article>
+        <article>
+            <h3>{{ analytics.active_users }}</h3>
+            <p>Active Users</p>
+        </article>
+        <article>
+            <h3>{{ analytics.user_growth_percent }}%</h3>
+            <p>User Growth (30d)</p>
+        </article>
+    </div>
+</section>
+
+<section class="panel">
+    <h2>Prioritized Alerts</h2>
+    <div class="alert-grid">
+        {% for alert in alerts %}
+            <article class="alert-card {{ alert.severity }}">
+                <h3>{{ alert.title }}</h3>
+                <p>{{ alert.message }}</p>
+            </article>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

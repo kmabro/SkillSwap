@@ -1,0 +1,101 @@
+{% extends 'user/base.html' %}
+{% block content %}
+<section class="panel small">
+    <h2>Edit Profile</h2>
+    <form method="post" enctype="multipart/form-data" class="form-grid profile-edit-form">
+        <section class="profile-edit-section">
+            <h3>Identity</h3>
+            <div class="profile-image-editor">
+            <img
+                id="profilePreview"
+                class="profile-avatar"
+                src="{{ url_for('static', filename=g.user.profile_image_path) }}"
+                alt="Current profile image"
+                onerror="this.onerror=null;this.src='{{ url_for('static', filename='images/default-avatar.svg') }}';"
+            >
+            <label>Profile Picture
+                <input id="profileImageInput" type="file" name="profile_image" accept=".jpg,.jpeg,.png">
+                <small class="muted">Accepted: JPG, JPEG, PNG. Max size: 2MB.</small>
+            </label>
+        </div>
+
+        <label>Bio
+            <textarea id="bioInput" name="bio" rows="4" maxlength="300" placeholder="Tell others about your skills and interests.">{{ g.user.bio if g.user.bio else '' }}</textarea>
+            <small class="muted"><span id="bioCounter">0 / 300</span> characters</small>
+        </label>
+        </section>
+
+        <section class="profile-edit-section">
+            <h3>Visibility and Status</h3>
+            <label>Location
+                <input type="text" name="location" maxlength="120" value="{{ g.user.location if g.user.location else '' }}" placeholder="City, Country">
+            </label>
+
+            <label>Availability Status
+                <select name="availability_status" required>
+                    {% for status in availability_statuses %}
+                        <option value="{{ status }}" {% if g.user.availability_label == status %}selected{% endif %}>{{ status }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+
+            <label class="checkbox-inline">
+                <input type="checkbox" name="show_email_on_profile" {% if g.user.show_email_on_profile %}checked{% endif %}>
+                Show email on profile
+            </label>
+        </section>
+
+        <div class="inline-actions profile-edit-actions">
+            <button class="btn" type="submit">Save Profile</button>
+            <a class="btn secondary" href="{{ url_for('user_profile', username=g.user.username) }}">Cancel</a>
+            <button id="openDeleteAccountModal" class="btn danger" type="button">Delete Account</button>
+        </div>
+    </form>
+</section>
+
+<dialog id="deleteAccountModal" class="report-modal">
+    <form method="post" action="{{ url_for('delete_account') }}" class="form-grid">
+        <h3>Delete Account</h3>
+        <p class="muted">Are you sure you want to delete your account?</p>
+        <label>Password Confirmation
+            <input type="password" name="password" required>
+        </label>
+        <div class="inline-actions">
+            <button class="btn danger" type="submit">Delete Account Permanently</button>
+            <button id="closeDeleteAccountModal" class="btn secondary" type="button">Cancel</button>
+        </div>
+    </form>
+</dialog>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    var bioInput = document.getElementById("bioInput");
+    var bioCounter = document.getElementById("bioCounter");
+
+    function updateBioCounter() {
+        if (!bioInput || !bioCounter) {
+            return;
+        }
+        bioCounter.textContent = String(bioInput.value.length) + " / 300";
+    }
+
+    if (bioInput && bioCounter) {
+        updateBioCounter();
+        bioInput.addEventListener("input", updateBioCounter);
+    }
+
+    var modal = document.getElementById("deleteAccountModal");
+    var openBtn = document.getElementById("openDeleteAccountModal");
+    var closeBtn = document.getElementById("closeDeleteAccountModal");
+    if (modal && openBtn && closeBtn) {
+        openBtn.addEventListener("click", function () {
+            modal.showModal();
+        });
+        closeBtn.addEventListener("click", function () {
+            modal.close();
+        });
+    }
+});
+</script>
+{% endblock %}
+

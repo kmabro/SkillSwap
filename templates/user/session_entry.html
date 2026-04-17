@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SkillSwap Session Entry</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Tahoma, sans-serif;
+            background: #f3f7f6;
+            color: #0f172a;
+            min-height: 100vh;
+        }
+
+        .entry-overlay {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(15, 23, 42, 0.25);
+            padding: 1rem;
+            z-index: 1200;
+        }
+
+        .entry-overlay[hidden] {
+            display: none !important;
+        }
+
+        .entry-card {
+            width: min(520px, calc(100vw - 2rem));
+            background: #fff;
+            border: 1px solid #dbe9e6;
+            border-radius: 12px;
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.1);
+            padding: 1rem 1.1rem;
+        }
+
+        p {
+            margin: 0.2rem 0;
+            color: #334155;
+            line-height: 1.45;
+        }
+
+        .actions {
+            margin-top: 0.85rem;
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            border: 1px solid #0f766e;
+            background: #0f766e;
+            color: #fff;
+            border-radius: 8px;
+            font-size: 0.84rem;
+            padding: 0.45rem 0.75rem;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .btn.secondary {
+            background: #fff;
+            color: #0f766e;
+        }
+    </style>
+</head>
+<body>
+    <div id="sessionEntryOverlay" class="entry-overlay" hidden>
+        <main class="entry-card" role="dialog" aria-modal="true" aria-labelledby="sessionEntryTitle">
+            <p id="sessionEntryTitle">Your session is being prepared in a new tab.</p>
+            <p>Note: This session is under surveillance to ensure proper usage and rule compliance.</p>
+            <div class="actions">
+                <a class="btn" id="openMeetingButton" href="{{ meeting_url }}" target="_blank" rel="noopener">Open Meeting</a>
+                <button class="btn secondary" id="leaveSessionButton" type="button">Leave Session</button>
+            </div>
+        </main>
+    </div>
+
+    <script>
+    (function () {
+        const requestId = {{ request_id|int }};
+        const meetingUrl = {{ meeting_url|tojson }};
+        const isParticipant = {{ 'true' if is_participant else 'false' }};
+        const openUrl = "/sessions/" + requestId + "/open";
+        const heartbeatUrl = "/requests/" + requestId + "/session-heartbeat";
+        const leaveUrl = "/requests/" + requestId + "/leave-session";
+        const overlay = document.getElementById("sessionEntryOverlay");
+        const openMeetingButton = document.getElementById("openMeetingButton");
+        const leaveButton = document.getElementById("leaveSessionButton");
+        let hasJoined = false;
+        let hasShownPopup = false;
+        let heartbeatTimer = null;
+
+        function post(url, keepalive) {
+            return fetch(url, {
+                method: "POST",
+                credentials: "same-origin",
+                keepalive: !!keepalive,
+                headers: { "X-Requested-With": "XMLHttpRequest" }
+            });
+        }
+
+        function startHeartbeat() {
+            if (!isParticipant) {
+                return;
+            }
+            post(heartbeatUrl, true).catch(function () {});
+            heartbeatTimer = window.setInterval(function () {
+                post(heartbeatUrl, false).catch(function () {});
+            }, 10000);
+        }
+
+        function leaveSession() {
+            if (!isParticipant || !hasJoined) {
+                return;
+            }
+            post(leaveUrl, true).catch(function () {});
+            hasJoined = false;
+            if (heartbeatTimer) {
+                window.clearInterval(heartbeatTimer);
+                heartbeatTimer = null;
+            }
+        }
+
+        function openMeeting() {
+            if (!isParticipant) {
+                window.open(meetingUrl, "_blank", "noopener");
+                return;
+            }
+
+            fetch(openUrl, {
+                method: "POST",
+                credentials: "same-origin",
+                headers: { "X-Requested-With": "XMLHttpRequest" }
+            })
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error("Failed to open session");
+                    }
+                    return response.json();
+                })
+                .then(function (payload) {
+                    const resolvedMeetingUrl = (payload && payload.meeting_url) ? payload.meeting_url : meetingUrl;
+                    hasJoined = true;
+                    if (!heartbeatTimer) {
+                        startHeartbeat();
+                    }
+                    window.open(resolvedMeetingUrl, "_blank", "noopener");
+                })
+                .catch(function () {
+                    window.open(meetingUrl, "_blank", "noopener");
+                });
+        }
+
+        if (openMeetingButton) {
+            openMeetingButton.addEventListener("click", function (event) {
+                event.preventDefault();
+                openMeeting();
+            });
+        }
+
+        if (leaveButton) {
+            leaveButton.addEventListener("click", function () {
+                leaveSession();
+                window.close();
+            });
+        }
+
+        if (overlay && !hasShownPopup) {
+            overlay.hidden = false;
+            hasShownPopup = true;
+        }
+
+        window.addEventListener("beforeunload", leaveSession);
+        if (openMeetingButton) {
+            openMeetingButton.focus();
+        }
+    })();
+    </script>
+</body>
+</html>

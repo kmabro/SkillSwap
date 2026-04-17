@@ -1,0 +1,143 @@
+{% extends 'user/base.html' %}
+{% block content %}
+<section class="panel chat-panel">
+    <h2>Messages</h2>
+    <div class="chat-layout">
+        <aside class="chat-sidebar">
+            <h3>Conversations</h3>
+            {% if contacts %}
+                <ul>
+                    {% for user in contacts %}
+                        <li>
+                            <a class="chat-user {% if active_user and active_user.user_id == user.user_id %}active-chat-user{% endif %}" data-chat-user-id="{{ user.user_id }}" href="{{ url_for('messages_thread', username=user.username) }}">
+                                <img class="chat-avatar" src="{{ url_for('static', filename=user.profile_image_path) }}" alt="{{ user.name }} avatar" onerror="this.onerror=null;this.src='{{ url_for('static', filename='images/default-avatar.svg') }}';">
+                                <span>@{{ user.username }}</span>
+                                {% if unread_map and unread_map.get(user.user_id) %}
+                                    <span class="notif-pill chat-unread-pill">{{ '9+' if unread_map.get(user.user_id) > 9 else unread_map.get(user.user_id) }}</span>
+                                {% endif %}
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <div class="empty-state compact">
+                    <p>No conversations yet<br>Start a chat from matches or requests.</p>
+                    <a class="btn tiny" href="{{ url_for('matches') }}">Find Matches</a>
+                </div>
+            {% endif %}
+        </aside>
+
+        <div class="chat-thread">
+            {% if active_user %}
+                <div class="chat-thread-header-box">
+                    <h3 class="chat-thread-title">
+                        <img class="chat-avatar" src="{{ url_for('static', filename=active_user.profile_image_path) }}" alt="{{ active_user.name }} avatar" onerror="this.onerror=null;this.src='{{ url_for('static', filename='images/default-avatar.svg') }}';">
+                        <a href="{{ url_for('user_profile', username=active_user.username) }}">@{{ active_user.username }}</a>
+                    </h3>
+                    <p class="muted chat-last-seen" id="chatPresenceLabel">{{ active_presence_label }}</p>
+                </div>
+                {% if messaging_blocked %}
+                    <div class="block-chat-note">
+                        <p>{{ block_notice or 'This user is blocked. You cannot send messages.' }}</p>
+                        {% if blocked_by_me %}
+                            <form method="post" action="{{ url_for('toggle_user_block', username=active_user.username) }}" class="block-chat-actions">
+                                <input type="hidden" name="next" value="{{ request.path }}">
+                                <button class="btn tiny warning" type="submit">Unblock User</button>
+                            </form>
+                        {% endif %}
+                    </div>
+                {% endif %}
+                <div class="messages-box" id="messagesBox" data-chat-username="{{ active_user.username }}" data-current-user-id="{{ g.user.user_id }}">
+                    {% for msg in messages %}
+                        {% set is_system = msg.message_type == 'system' or msg.message.startswith('[SYSTEM]') %}
+                        <div class="message-bubble {% if is_system %}system{% elif msg.sender_id == g.user.user_id %}mine{% else %}their{% endif %} {% if unread_message_ids and msg.message_id in unread_message_ids %}unread-highlight{% endif %}" data-message-id="{{ msg.message_id }}" data-message-type="{{ msg.message_type or 'user' }}">
+                            {% if is_system %}
+                                <span class="system-tag">SYSTEM</span>
+                            {% endif %}
+                            {% if msg.message %}
+                                <p>{{ msg.message|urlize(target='_blank', rel='noopener noreferrer') }}</p>
+                            {% endif %}
+                            {% if msg.attachment_url %}
+                                <div class="message-attachment" data-attachment-url="{{ msg.attachment_url }}" data-attachment-type="{{ msg.attachment_type or 'file' }}">
+                                    <a href="{{ msg.attachment_url }}" target="_blank" rel="noopener noreferrer" download>Open attachment</a>
+                                </div>
+                            {% endif %}
+                            <span>{{ msg.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                            {% if msg.sender_id == g.user.user_id and not is_system %}
+                                <span class="message-state">{{ 'Seen' if msg.read_at else 'Delivered' }}</span>
+                            {% endif %}
+                        </div>
+                    {% else %}
+                        <p class="muted">No messages yet. Start the conversation.</p>
+                    {% endfor %}
+                </div>
+                <form method="post" class="chat-form">
+                    <input type="text" name="message" maxlength="2000" placeholder="Type your message..." {% if messaging_blocked %}disabled aria-disabled="true"{% endif %}>
+                    <button type="button" class="chat-attach-btn" id="attachBtn" aria-label="Attach file" title="Attach file" {% if messaging_blocked %}disabled aria-disabled="true"{% endif %}>
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                            <path d="M16.5 6.5l-7.78 7.78a3 3 0 104.24 4.24l8.13-8.13a5 5 0 10-7.07-7.07L5.2 12.15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+                        </svg>
+                    </button>
+                    <input type="hidden" name="attachment_url" id="attachmentUrlInput">
+                    <input type="hidden" name="attachment_type" id="attachmentTypeInput">
+                    <input type="hidden" name="file_name" id="attachmentFileNameInput">
+                    <input type="hidden" name="file_size" id="attachmentFileSizeInput">
+                    <input type="file" id="fileInput" multiple hidden>
+                    <button class="btn" type="submit" {% if messaging_blocked %}disabled aria-disabled="true"{% endif %}>Send</button>
+                    <div class="selected-files" id="selectedFilesContainer" hidden style="display: none;">
+                        <div class="selected-files-list" id="selectedFilesList"></div>
+                        <span class="selected-files-count" id="selectedFilesCount">0 Files</span>
+                    </div>
+                </form>
+            {% else %}
+                <div class="empty-state compact">
+                    <p>Select a conversation to start chatting.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<dialog id="reportModal" class="report-modal">
+    <form method="post" action="{{ url_for('create_report') }}" class="form-grid" id="reportForm" enctype="multipart/form-data">
+        <input type="hidden" id="reportUserIdInput" name="reported_user_id" required>
+        <h3>Report User</h3>
+        <div id="report-error" class="report-error hidden"></div>
+        <label>Reason
+            <select name="reason" required>
+                {% for reason in report_reasons %}
+                    <option value="{{ reason }}">{{ reason }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Description
+            <textarea name="description" rows="4" maxlength="1000" placeholder="Describe what happened (optional)"></textarea>
+        </label>
+        <label>Attach proof (optional)
+            <input type="file" id="reportAttachment" name="attachments" multiple>
+        </label>
+        <div class="inline-actions">
+            <button class="btn" type="submit">Submit Report</button>
+            <button class="btn secondary close-report-modal" type="button">Cancel</button>
+        </div>
+    </form>
+</dialog>
+
+<style>
+    .report-error {
+        background-color: #ffe5e5;
+        color: #b30000;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 14px;
+        margin-bottom: 10px;
+        text-align: center;
+        transition: opacity 0.3s ease;
+    }
+
+    .hidden {
+        display: none;
+    }
+</style>
+{% endblock %}
+

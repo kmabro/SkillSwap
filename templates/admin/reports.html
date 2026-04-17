@@ -1,0 +1,719 @@
+{% extends 'admin/base_admin.html' %}
+{% block admin_content %}
+<section class="panel">
+    <form id="reportsFilterForm" method="get" class="form-grid reports-filter-form">
+        <label>Search
+            <div class="search-input-wrap">
+                <input id="reportSearchInput" type="text" name="q" value="{{ q }}" placeholder="Search by reporter or reported user" autocomplete="off">
+                <button id="clearReportSearch" class="search-clear-btn" type="button" aria-label="Clear search" {% if not q %}hidden{% endif %}>x</button>
+            </div>
+        </label>
+        <label>Status
+            <select name="status" id="reportStatusSelect">
+                <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All</option>
+                <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
+                <option value="reviewing" {% if status_filter == 'reviewing' %}selected{% endif %}>Reviewing</option>
+                <option value="warned" {% if status_filter == 'warned' %}selected{% endif %}>Warned</option>
+                <option value="resolved" {% if status_filter == 'resolved' %}selected{% endif %}>Resolved</option>
+                <option value="blocked" {% if status_filter == 'blocked' %}selected{% endif %}>Blocked</option>
+            </select>
+        </label>
+    </form>
+</section>
+
+<section class="panel" id="reportsResultsPanel">
+    <div class="table-wrap">
+        <table data-enhance="true" data-server-pagination="true">
+            <thead>
+                <tr>
+                    <th>Reporter</th>
+                    <th class="text-center">Reported User</th>
+                    <th class="text-center">Reason</th>
+                    <th>Description</th>
+                    <th class="text-center">Status</th>
+                    <th class="no-sort text-center">Attachments</th>
+                    <th class="no-sort text-center actions-cell">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for rep in reports %}
+                    <tr>
+                        <td class="username-col text-center" title="{% if rep.reporter %}@{{ rep.reporter.username }}{% endif %}">
+                            {% if rep.reporter %}
+                                <a class="user-link" href="{{ url_for('user_profile', username=rep.reporter.username) }}" target="_blank" rel="noopener">
+                                    <span class="avatar-pill">
+                                        <span class="avatar" aria-hidden="true">
+                                            <img
+                                                src="{{ url_for('static', filename=rep.reporter.profile_image_path) }}"
+                                                alt="@{{ rep.reporter.username }} avatar"
+                                                loading="lazy"
+                                                onerror="this.onerror=null;this.src='{{ url_for('static', filename='images/default-avatar.svg') }}';"
+                                            >
+                                        </span>
+                                        <span class="user-label">{{ highlight_text('@' ~ rep.reporter.username, q) }}</span>
+                                    </span>
+                                </a>
+                            {% else %}
+                                <div class="cell-flex">-</div>
+                            {% endif %}
+                        </td>
+                        <td class="username-col text-center" title="{% if rep.reported_user %}@{{ rep.reported_user.username }}{% endif %}">
+                            {% if rep.reported_user %}
+                                <a class="user-link" href="{{ url_for('user_profile', username=rep.reported_user.username) }}" target="_blank" rel="noopener">
+                                    <span class="avatar-pill">
+                                        <span class="avatar" aria-hidden="true">
+                                            <img
+                                                src="{{ url_for('static', filename=rep.reported_user.profile_image_path) }}"
+                                                alt="@{{ rep.reported_user.username }} avatar"
+                                                loading="lazy"
+                                                onerror="this.onerror=null;this.src='{{ url_for('static', filename='images/default-avatar.svg') }}';"
+                                            >
+                                        </span>
+                                        <span class="user-label">{{ highlight_text('@' ~ rep.reported_user.username, q) }}</span>
+                                    </span>
+                                </a>
+                            {% else %}
+                                <div class="cell-flex">-</div>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% set severity = rep.reason|lower %}
+                            <span class="badge {% if severity in ['abuse', 'fake'] %}status-blocked{% else %}status-pending{% endif %}">{{ rep.reason }}</span>
+                        </td>
+                        <td class="description-col">
+                            {% set full_description = rep.description if rep.description else '-' %}
+                            {% set preview_description = (rep.description[:90] ~ ('...' if rep.description|length > 90 else '')) if rep.description else '-' %}
+                            <div class="description-text description-clamp" title="{{ full_description }}">{{ preview_description }}</div>
+                            {% if rep.description and rep.description|length > 90 %}
+                                <button
+                                    class="description-see-more"
+                                    type="button"
+                                    data-reporter="{{ (('@' ~ rep.reporter.username) if rep.reporter else 'Unknown')|e }}"
+                                    data-reported="{{ (('@' ~ rep.reported_user.username) if rep.reported_user else 'Unknown')|e }}"
+                                    data-description="{{ full_description|e }}"
+                                >See more</button>
+                            {% endif %}
+                        </td>
+                        {% set report_status_class = rep.status|replace('_', '-') %}
+                        <td class="text-center"><div class="status-cell"><span class="badge status-{{ report_status_class }}">{{ rep.status|replace('_', ' ')|title }}</span></div></td>
+                        <td class="text-center">
+                            {% set attachments = report_attachments.get(rep.report_id, []) %}
+                            {% if attachments %}
+                                <div class="report-attachments">
+                                    {% for file in attachments %}
+                                        {% if file.is_image %}
+                                            <a class="attachment-item" href="{{ file.url }}" target="_blank" rel="noopener" title="{{ file.filename }}">
+                                                <img class="attachment-thumb" src="{{ file.url }}" alt="Attachment preview" loading="lazy">
+                                            </a>
+                                        {% else %}
+                                            <a class="attachment-item" href="{{ file.url }}" target="_blank" rel="noopener" title="{{ file.filename }}">
+                                                <span class="attachment-file-icon">{{ file.file_type|upper }}</span>
+                                            </a>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <div class="cell-flex">-</div>
+                            {% endif %}
+                        </td>
+                        <td class="actions-cell text-center">
+                            {% set status_key = (rep.status or 'pending')|lower %}
+                            {% if status_key == 'pending' %}
+                                <div class="actions-container">
+                                    <form class="report-action-form" method="post" action="{{ url_for('admin_report_review', report_id=rep.report_id) }}">
+                                        <button class="btn tiny" type="submit">Start Review</button>
+                                    </form>
+                                    <form class="report-action-form" method="post" action="{{ url_for('admin_report_block', report_id=rep.report_id) }}" onsubmit="return confirm('Block reported user?');">
+                                        <button class="btn tiny danger" type="submit">Block User</button>
+                                    </form>
+                                </div>
+                            {% elif status_key == 'reviewing' %}
+                                <div class="actions-container">
+                                    <form class="report-action-form" method="post" action="{{ url_for('admin_report_warn', report_id=rep.report_id) }}">
+                                        <button class="btn tiny secondary" type="submit">Warn User</button>
+                                    </form>
+                                    <form class="report-action-form" method="post" action="{{ url_for('admin_report_resolve', report_id=rep.report_id) }}">
+                                        <button class="btn tiny" type="submit">Mark Resolved</button>
+                                    </form>
+                                    <form class="report-action-form" method="post" action="{{ url_for('admin_report_block', report_id=rep.report_id) }}" onsubmit="return confirm('Block reported user?');">
+                                        <button class="btn tiny danger" type="submit">Block User</button>
+                                    </form>
+                                </div>
+                            {% elif status_key == 'warned' %}
+                                <div class="status-cell"><span class="badge">Action Taken</span></div>
+                            {% elif status_key == 'blocked' %}
+                                <div class="actions-container">
+                                    <div class="status-cell"><span class="badge status-blocked">User Blocked</span></div>
+                                    <form class="report-action-form" method="post" action="{{ url_for('admin_report_unblock', report_id=rep.report_id) }}">
+                                        <button class="btn tiny secondary" type="submit">Unblock User</button>
+                                    </form>
+                                </div>
+                            {% else %}
+                                <div class="status-cell"><span class="badge">Action Taken</span></div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="7">No reports found</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if pagination and pagination.pages > 1 %}
+        <div class="server-pagination">
+            {% if pagination.has_prev %}
+                <a class="btn tiny secondary" href="{{ url_for('admin_reports_page', page=pagination.prev_num, status=status_filter, q=q) }}">Prev</a>
+            {% else %}
+                <button class="btn tiny secondary" type="button" disabled>Prev</button>
+            {% endif %}
+            <span>Page {{ pagination.page }} of {{ pagination.pages }}</span>
+            {% if pagination.has_next %}
+                <a class="btn tiny secondary" href="{{ url_for('admin_reports_page', page=pagination.next_num, status=status_filter, q=q) }}">Next</a>
+            {% else %}
+                <button class="btn tiny secondary" type="button" disabled>Next</button>
+            {% endif %}
+        </div>
+    {% endif %}
+</section>
+
+<div id="descriptionModal" class="report-modal" hidden>
+    <div class="report-modal-backdrop" data-modal-close="true"></div>
+    <div class="report-modal-card" role="dialog" aria-modal="true" aria-labelledby="descriptionModalTitle">
+        <div class="report-modal-head">
+            <h3 id="descriptionModalTitle">Report Description</h3>
+            <button id="closeDescriptionModal" class="btn tiny secondary" type="button">Close</button>
+        </div>
+        <div class="report-modal-meta">
+            <div><strong>Reporter:</strong> <span id="modalReporter">-</span></div>
+            <div><strong>Reported User:</strong> <span id="modalReportedUser">-</span></div>
+        </div>
+        <div id="modalDescriptionBody" class="report-modal-body"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    .reports-filter-form {
+        grid-template-columns: minmax(260px, 1.8fr) minmax(180px, 1fr);
+        gap: 0.65rem;
+        align-items: end;
+    }
+
+    .search-input-wrap {
+        position: relative;
+    }
+
+    .search-input-wrap input {
+        padding-right: 2rem;
+    }
+
+    .search-clear-btn {
+        position: absolute;
+        right: 0.38rem;
+        top: 50%;
+        transform: translateY(-50%);
+        border: 0;
+        background: transparent;
+        color: #506260;
+        font-size: 1rem;
+        line-height: 1;
+        cursor: pointer;
+        padding: 0.2rem;
+    }
+
+    .search-clear-btn:hover {
+        color: #0f766e;
+    }
+
+    mark.search-hit {
+        background: #fff3b0;
+        border-radius: 3px;
+        padding: 0 2px;
+    }
+
+    .table-wrap {
+        overflow-x: auto;
+    }
+
+    #reportsResultsPanel table {
+        width: 100%;
+        table-layout: fixed;
+    }
+
+    #reportsResultsPanel table tr {
+        width: 100%;
+    }
+
+    #reportsResultsPanel table td {
+        vertical-align: middle;
+    }
+
+    #reportsResultsPanel tbody tr:hover {
+        background-color: #f3f0ff;
+    }
+
+    #reportsResultsPanel tbody tr:hover td {
+        background-color: inherit;
+    }
+
+    #reportsResultsPanel table th:nth-child(1),
+    #reportsResultsPanel table td:nth-child(1) {
+        width: 15%;
+    }
+
+    #reportsResultsPanel table th:nth-child(2),
+    #reportsResultsPanel table td:nth-child(2) {
+        width: 15%;
+    }
+
+    #reportsResultsPanel table th:nth-child(3),
+    #reportsResultsPanel table td:nth-child(3) {
+        width: 10%;
+    }
+
+    #reportsResultsPanel table th:nth-child(4),
+    #reportsResultsPanel table td:nth-child(4) {
+        width: 30%;
+    }
+
+    #reportsResultsPanel table th:nth-child(5),
+    #reportsResultsPanel table td:nth-child(5) {
+        width: 10%;
+    }
+
+    #reportsResultsPanel table th:nth-child(6),
+    #reportsResultsPanel table td:nth-child(6) {
+        width: 10%;
+    }
+
+    #reportsResultsPanel table th:nth-child(7),
+    #reportsResultsPanel table td:nth-child(7) {
+        width: 25%;
+    }
+
+    .text-center {
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    .cell-flex {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+    }
+
+    .status-cell {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+    }
+
+    .username-col {
+        max-width: 170px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .username-col .avatar {
+        width: 30px;
+        height: 30px;
+        font-size: 0.72rem;
+    }
+
+    .username-col .avatar-pill {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .username-col .user-link {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        max-width: 100%;
+        overflow: hidden;
+    }
+
+    .username-col .user-label {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .description-col {
+        max-width: 260px;
+        text-align: left;
+        vertical-align: middle;
+    }
+
+    .description-text {
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+
+    .description-clamp {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        line-height: 1.35;
+        max-height: 4.05em;
+    }
+
+    .description-see-more {
+        border: 0;
+        background: transparent;
+        color: #0f766e;
+        font-size: 0.78rem;
+        font-weight: 700;
+        margin-top: 0.2rem;
+        padding: 0;
+        cursor: pointer;
+    }
+
+    .report-attachments {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.35rem;
+        flex-wrap: wrap;
+        max-width: 100%;
+        overflow: hidden;
+    }
+
+    .attachment-item {
+        width: 46px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-decoration: none;
+        color: #0f172a;
+    }
+
+    .attachment-thumb {
+        width: 46px;
+        height: 46px;
+        border-radius: 8px;
+        object-fit: cover;
+        border: 1px solid #cfe1df;
+        background: #f3faf8;
+        display: block;
+    }
+
+    .attachment-file-icon {
+        width: 46px;
+        height: 46px;
+        border-radius: 8px;
+        border: 1px solid #cfe1df;
+        background: #f5fbfa;
+        color: #1f4fbf;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.68rem;
+        font-weight: 700;
+    }
+
+    .actions-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        width: 100%;
+        max-width: 180px;
+        margin: 0 auto;
+    }
+
+    .actions-cell {
+        min-width: 220px;
+        max-width: 240px;
+    }
+
+    .actions-container form {
+        margin: 0;
+        width: 100%;
+    }
+
+    .actions-container .btn {
+        width: 100%;
+        max-width: 160px;
+        height: 30px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        white-space: nowrap;
+        padding: 0 0.5rem;
+    }
+
+    .badge.status-warned {
+        background: #fff8eb;
+        color: #945f06;
+        border-color: #f0ddb4;
+    }
+
+    .badge.status-reviewing {
+        background: #e9f0ff;
+        color: #1f4fbf;
+        border-color: #c9d9ff;
+    }
+
+    .report-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 1200;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+    }
+
+    .report-modal[hidden] {
+        display: none !important;
+    }
+
+    .report-modal-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(7, 20, 27, 0.45);
+    }
+
+    .report-modal-card {
+        position: relative;
+        width: min(640px, calc(100vw - 2rem));
+        max-height: calc(100vh - 2rem);
+        overflow: hidden;
+        border-radius: 12px;
+        border: 1px solid #dbe9e6;
+        background: #fff;
+        box-shadow: 0 16px 38px rgba(15, 23, 42, 0.2);
+        padding: 0.9rem;
+    }
+
+    .report-modal-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 0.4rem;
+    }
+
+    .report-modal-head h3 {
+        margin: 0;
+        font-size: 1rem;
+    }
+
+    .report-modal-meta {
+        font-size: 0.82rem;
+        color: #334155;
+        margin-bottom: 0.5rem;
+        display: grid;
+        gap: 0.25rem;
+    }
+
+    .report-modal-body {
+        max-height: 50vh;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+        color: #0f172a;
+        padding-right: 0.2rem;
+    }
+
+    @media (max-width: 900px) {
+        .reports-filter-form {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const form = document.getElementById("reportsFilterForm");
+    const resultsPanel = document.getElementById("reportsResultsPanel");
+    const searchInput = document.getElementById("reportSearchInput");
+    const clearButton = document.getElementById("clearReportSearch");
+    const statusSelect = document.getElementById("reportStatusSelect");
+    const descriptionModal = document.getElementById("descriptionModal");
+    const closeDescriptionModal = document.getElementById("closeDescriptionModal");
+    const modalReporter = document.getElementById("modalReporter");
+    const modalReportedUser = document.getElementById("modalReportedUser");
+    const modalDescriptionBody = document.getElementById("modalDescriptionBody");
+
+    if (!form || !resultsPanel || !searchInput || !clearButton || !statusSelect || !descriptionModal || !closeDescriptionModal || !modalReporter || !modalReportedUser || !modalDescriptionBody) {
+        return;
+    }
+
+    let debounceTimer = null;
+    let requestId = 0;
+
+    function buildQueryParams() {
+        const params = new URLSearchParams();
+        const q = searchInput.value.trim();
+        if (q) {
+            params.set("q", q);
+        }
+        if (statusSelect.value && statusSelect.value !== "all") {
+            params.set("status", statusSelect.value);
+        }
+        return params;
+    }
+
+    function refreshReports(targetUrl, pushHistory) {
+        const currentRequest = ++requestId;
+
+        fetch(targetUrl, {
+            method: "GET",
+            headers: { "X-Requested-With": "XMLHttpRequest" },
+            credentials: "same-origin"
+        })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error("Failed to refresh reports list");
+                }
+                return response.text();
+            })
+            .then(function (htmlText) {
+                if (currentRequest !== requestId) {
+                    return;
+                }
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(htmlText, "text/html");
+                const nextPanel = doc.getElementById("reportsResultsPanel");
+                if (!nextPanel) {
+                    return;
+                }
+                resultsPanel.innerHTML = nextPanel.innerHTML;
+                bindPaginationLinks();
+                bindDynamicControls();
+                if (pushHistory) {
+                    window.history.replaceState({}, "", targetUrl);
+                }
+            })
+            .catch(function () {});
+    }
+
+    function submitReportAction(formElement) {
+        const formData = new FormData(formElement);
+        const targetUrl = formElement.getAttribute("action");
+        if (!targetUrl) {
+            return;
+        }
+        fetch(targetUrl, {
+            method: "POST",
+            headers: { "X-Requested-With": "XMLHttpRequest" },
+            body: formData,
+            credentials: "same-origin"
+        })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error("Failed to apply report action");
+                }
+                return response.json();
+            })
+            .then(function (payload) {
+                if (!payload || !payload.ok) {
+                    throw new Error("Failed to apply report action");
+                }
+                refreshReports(window.location.href, true);
+            })
+            .catch(function () {});
+    }
+
+    function openDescriptionModal(reporter, reportedUser, description) {
+        modalReporter.textContent = reporter || "-";
+        modalReportedUser.textContent = reportedUser || "-";
+        modalDescriptionBody.textContent = description || "-";
+        descriptionModal.hidden = false;
+    }
+
+    function closeDescriptionModalView() {
+        descriptionModal.hidden = true;
+    }
+
+    function fetchFilteredResults(pushHistory) {
+        const params = buildQueryParams();
+        params.delete("page");
+        const queryString = params.toString();
+        const targetUrl = "{{ url_for('admin_reports_page') }}" + (queryString ? ("?" + queryString) : "");
+        refreshReports(targetUrl, pushHistory);
+    }
+
+    function scheduleFetch() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(function () {
+            fetchFilteredResults(true);
+        }, 350);
+    }
+
+    function bindPaginationLinks() {
+        resultsPanel.querySelectorAll(".server-pagination a").forEach(function (link) {
+            link.addEventListener("click", function (event) {
+                event.preventDefault();
+                const href = link.getAttribute("href");
+                if (!href) {
+                    return;
+                }
+                refreshReports(href, true);
+            });
+        });
+    }
+
+    function bindDynamicControls() {
+        resultsPanel.querySelectorAll(".description-see-more").forEach(function (button) {
+            button.addEventListener("click", function () {
+                openDescriptionModal(
+                    button.getAttribute("data-reporter") || "",
+                    button.getAttribute("data-reported") || "",
+                    button.getAttribute("data-description") || ""
+                );
+            });
+        });
+
+        resultsPanel.querySelectorAll("form.report-action-form").forEach(function (actionForm) {
+            actionForm.addEventListener("submit", function (event) {
+                event.preventDefault();
+                submitReportAction(actionForm);
+            });
+        });
+    }
+
+    searchInput.addEventListener("input", function () {
+        const hasValue = searchInput.value.trim().length > 0;
+        clearButton.hidden = !hasValue;
+        scheduleFetch();
+    });
+
+    clearButton.addEventListener("click", function () {
+        searchInput.value = "";
+        clearButton.hidden = true;
+        fetchFilteredResults(true);
+    });
+
+    statusSelect.addEventListener("change", function () {
+        fetchFilteredResults(true);
+    });
+
+    closeDescriptionModal.addEventListener("click", closeDescriptionModalView);
+    descriptionModal.addEventListener("click", function (event) {
+        const target = event.target;
+        if (target && target.getAttribute && target.getAttribute("data-modal-close") === "true") {
+            closeDescriptionModalView();
+        }
+    });
+
+    document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && !descriptionModal.hidden) {
+            closeDescriptionModalView();
+        }
+    });
+
+    bindPaginationLinks();
+    bindDynamicControls();
+});
+</script>
+{% endblock %}

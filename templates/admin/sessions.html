@@ -1,0 +1,313 @@
+{% extends 'admin/base_admin.html' %}
+{% block admin_content %}
+<section class="panel">
+    <form method="get" class="form-grid sessions-search-form">
+        <label>Search Session
+            <input type="text" name="q" value="{{ q }}" placeholder="Search by Session ID" autocomplete="off">
+        </label>
+    </form>
+</section>
+
+<section class="panel">
+    <h2>Live Exchange Sessions</h2>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Session ID</th>
+                    <th>Participants</th>
+                    <th>Skill Exchange</th>
+                    <th>Start Time</th>
+                    <th class="text-center">Active Participants</th>
+                    <th>Meeting Link</th>
+                    <th class="no-sort text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for req in exchange_sessions %}
+                    {% set offered = req.final_offered_skill.skill_name if req.final_offered_skill else (req.offered_skill.skill_name if req.offered_skill else '-') %}
+                    {% set requested = req.final_requested_skill.skill_name if req.final_requested_skill else (req.requested_skill.skill_name if req.requested_skill else '-') %}
+                    {% set session_id_text = req.session_room %}
+                    {% set short_session_id = 'skillswap-' ~ session_id_text.split('-')[-1] %}
+                    <tr data-request-id="{{ req.request_id }}">
+                        <td title="{{ session_id_text }}">
+                            {{ short_session_id }}
+                        </td>
+                        <td class="nowrap-cell participants-cell">
+                            <a href="{{ url_for('user_profile', username=req.sender.username) }}" target="_blank" rel="noopener">@{{ req.sender.username }}</a>
+                            <span class="muted">&harr;</span>
+                            <a href="{{ url_for('user_profile', username=req.receiver.username) }}" target="_blank" rel="noopener">@{{ req.receiver.username }}</a>
+                        </td>
+                        <td>
+                            {{ offered }} <span class="muted">&harr;</span> {{ requested }}
+                        </td>
+                        <td class="nowrap-cell">{{ req.session_started_at.strftime('%Y-%m-%d %H:%M') if req.session_started_at else '-' }}</td>
+                        <td class="text-center"><span data-active-count>{{ participant_activity_counts.get(req.request_id, 0) }}</span></td>
+                        <td>
+                            {% if req.session_link %}
+                                <div class="inline-actions">
+                                    <a class="btn tiny secondary" href="{{ req.session_link }}" target="_blank" rel="noopener">Join Session</a>
+                                    <button class="btn tiny" type="button" data-copy-link="{{ req.session_link }}">Copy Link</button>
+                                </div>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <div class="inline-actions centered-actions">
+                                <form method="post" action="{{ url_for('admin_end_exchange_session', request_id=req.request_id) }}" onsubmit="return confirm('End this exchange session?');">
+                                    <button class="btn tiny danger" type="submit">End Session</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="7" class="empty-live-state">No active exchange sessions</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="history-header-row">
+        <h2>Session History</h2>
+        <form method="get" class="history-filter-form">
+            <input type="hidden" name="q" value="{{ q }}">
+            <label>Status Filter
+                <select name="history_status" onchange="this.form.submit()">
+                    <option value="all" {% if history_status == 'all' %}selected{% endif %}>All</option>
+                    <option value="completed" {% if history_status == 'completed' %}selected{% endif %}>Completed</option>
+                    <option value="terminated" {% if history_status == 'terminated' %}selected{% endif %}>Terminated</option>
+                </select>
+            </label>
+        </form>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Session ID</th>
+                    <th>Participants</th>
+                    <th>Skill Exchange</th>
+                    <th>Start Time</th>
+                    <th>End Time</th>
+                    <th>Status</th>
+                    <th>Meeting Link</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for req in session_history %}
+                    {% set offered = req.final_offered_skill.skill_name if req.final_offered_skill else (req.offered_skill.skill_name if req.offered_skill else '-') %}
+                    {% set requested = req.final_requested_skill.skill_name if req.final_requested_skill else (req.requested_skill.skill_name if req.requested_skill else '-') %}
+                    {% set session_id_text = req.session_room %}
+                    {% set short_session_id = 'skillswap-' ~ session_id_text.split('-')[-1] %}
+                    {% set archived_link = req.session_link %}
+                    <tr>
+                        <td title="{{ session_id_text }}">{{ short_session_id }}</td>
+                        <td class="nowrap-cell participants-cell">
+                            <a href="{{ url_for('user_profile', username=req.sender.username) }}" target="_blank" rel="noopener">@{{ req.sender.username }}</a>
+                            <span class="muted">&harr;</span>
+                            <a href="{{ url_for('user_profile', username=req.receiver.username) }}" target="_blank" rel="noopener">@{{ req.receiver.username }}</a>
+                        </td>
+                        <td>{{ offered }} <span class="muted">&harr;</span> {{ requested }}</td>
+                        <td class="nowrap-cell">{{ req.session_started_at.strftime('%Y-%m-%d %H:%M') if req.session_started_at else '-' }}</td>
+                        <td class="nowrap-cell">{{ req.session_completed_at.strftime('%Y-%m-%d %H:%M') if req.session_completed_at else '-' }}</td>
+                        <td>
+                            <span class="badge {% if req.status == 'completed' %}status-completed{% else %}status-terminated{% endif %}">
+                                {{ 'Completed' if req.status == 'completed' else 'Terminated' }}
+                            </span>
+                        </td>
+                        <td><span class="history-link-text">{{ archived_link }}</span></td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="7" class="empty-live-state">No session history found</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    .sessions-search-form {
+        grid-template-columns: minmax(260px, 1fr);
+    }
+
+    .history-header-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.8rem;
+        margin-bottom: 0.7rem;
+    }
+
+    .history-header-row h2 {
+        margin-bottom: 0;
+    }
+
+    .history-filter-form {
+        display: flex;
+        align-items: end;
+        gap: 0.5rem;
+    }
+
+    .history-filter-form label {
+        min-width: 190px;
+    }
+
+    .centered-actions {
+        justify-content: center;
+    }
+
+    .centered-actions .btn {
+        min-width: 112px;
+    }
+
+    .muted {
+        color: #64748b;
+        margin: 0 0.25rem;
+    }
+
+    .nowrap-cell {
+        white-space: nowrap;
+    }
+
+    .participants-cell {
+        font-size: 0.92rem;
+    }
+
+    [data-copy-link] {
+        min-width: 94px;
+    }
+
+    .empty-live-state {
+        text-align: center;
+        color: #64748b;
+        padding: 1.1rem 0.8rem;
+    }
+
+    .badge.status-terminated {
+        background: #f1f0ff;
+        color: #5b4b8a;
+        border-color: #d9d4f4;
+    }
+
+    .history-link-text {
+        font-family: "Consolas", "Courier New", monospace;
+        font-size: 0.84rem;
+        color: #475569;
+        word-break: break-all;
+        display: inline-block;
+    }
+
+    @media (max-width: 900px) {
+        .history-header-row {
+            flex-direction: column;
+            align-items: stretch;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const tableBody = document.querySelector("#admin-content table tbody") || document.querySelector("table tbody");
+
+    document.querySelectorAll("[data-copy-link]").forEach(function (button) {
+        button.addEventListener("click", function () {
+            const link = button.getAttribute("data-copy-link") || "";
+            if (!link) {
+                return;
+            }
+
+            const absoluteLink = link.startsWith("http") ? link : (window.location.origin + link);
+
+            const fallbackCopy = function () {
+                const tempInput = document.createElement("input");
+                tempInput.value = absoluteLink;
+                document.body.appendChild(tempInput);
+                tempInput.select();
+                try {
+                    document.execCommand("copy");
+                    button.textContent = "Copied";
+                } finally {
+                    document.body.removeChild(tempInput);
+                }
+            };
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(absoluteLink)
+                    .then(function () {
+                        button.textContent = "Copied";
+                    })
+                    .catch(fallbackCopy);
+            } else {
+                fallbackCopy();
+            }
+
+            window.setTimeout(function () {
+                button.textContent = "Copy Link";
+            }, 1400);
+        });
+    });
+
+    function syncLiveState() {
+        if (!tableBody) {
+            return;
+        }
+
+        const rows = Array.from(tableBody.querySelectorAll("tr[data-request-id]"));
+        if (!rows.length) {
+            return;
+        }
+
+        const ids = rows.map(function (row) { return row.getAttribute("data-request-id"); }).filter(Boolean);
+        fetch("{{ url_for('admin_sessions_live_state') }}?ids=" + encodeURIComponent(ids.join(",")), {
+            headers: { "X-Requested-With": "XMLHttpRequest" },
+            credentials: "same-origin"
+        })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error("Failed live sync");
+                }
+                return response.json();
+            })
+            .then(function (payload) {
+                if (!payload || !Array.isArray(payload.sessions)) {
+                    return;
+                }
+
+                const stateById = {};
+                payload.sessions.forEach(function (item) {
+                    stateById[String(item.request_id)] = item;
+                });
+
+                rows.forEach(function (row) {
+                    const id = row.getAttribute("data-request-id");
+                    const state = stateById[id];
+                    if (!state || !state.is_live) {
+                        row.remove();
+                        return;
+                    }
+
+                    const countEl = row.querySelector("[data-active-count]");
+                    if (countEl) {
+                        countEl.textContent = String(state.participants_active || 0);
+                    }
+                });
+
+                if (!tableBody.querySelector("tr[data-request-id]")) {
+                    tableBody.innerHTML = '<tr><td colspan="7" class="empty-live-state">No active exchange sessions</td></tr>';
+                }
+            })
+            .catch(function () {});
+    }
+
+    syncLiveState();
+    window.setInterval(syncLiveState, 2000);
+});
+</script>
+{% endblock %}

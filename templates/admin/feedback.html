@@ -1,0 +1,529 @@
+{% extends 'admin/base_admin.html' %}
+{% block admin_content %}
+<section class="panel">
+    <form id="feedbackFilterForm" method="get" class="form-grid feedback-filter-form">
+        <label>Search
+            <div class="search-input-wrap">
+                <input id="feedbackSearchInput" type="text" name="q" value="{{ q }}" placeholder="Search by user or review" autocomplete="off">
+                <button id="clearFeedbackSearch" class="search-clear-btn" type="button" aria-label="Clear search" {% if not q %}hidden{% endif %}>x</button>
+            </div>
+        </label>
+        <label>Rating
+            <select name="rating" id="feedbackRatingSelect">
+                <option value="all" {% if rating_filter == 'all' %}selected{% endif %}>All Ratings</option>
+                <option value="low" {% if rating_filter == 'low' %}selected{% endif %}>Low (1-2)</option>
+                <option value="mid" {% if rating_filter == 'mid' %}selected{% endif %}>Neutral (3)</option>
+                <option value="high" {% if rating_filter == 'high' %}selected{% endif %}>High (4-5)</option>
+            </select>
+        </label>
+    </form>
+</section>
+
+<section class="panel" id="feedbackResultsPanel">
+    <div class="table-wrap">
+        <table data-enhance="true" data-server-pagination="true">
+            <thead>
+                <tr>
+                    <th>From User</th>
+                    <th>To User</th>
+                    <th class="text-center">Rating</th>
+                    <th>Review</th>
+                    <th class="text-center no-sort">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row, from_username, to_username, from_profile_image, to_profile_image in feedback_rows %}
+                    {% set review_text = row.feedback if row.feedback else '' %}
+                    <tr>
+                        <td class="user-col">
+                            <a class="user-link" href="{{ url_for('user_profile', username=from_username) }}" target="_blank" rel="noopener" title="@{{ from_username }}">
+                                <span class="avatar" aria-hidden="true">
+                                    <img
+                                        src="{{ url_for('static', filename=from_profile_image if from_profile_image else 'images/default-avatar.svg') }}"
+                                        alt="@{{ from_username }} avatar"
+                                        loading="lazy"
+                                        onerror="this.onerror=null;this.src='{{ url_for('static', filename='images/default-avatar.svg') }}';"
+                                    >
+                                </span>
+                                <span class="user-label">{{ highlight_text('@' ~ from_username, q) }}</span>
+                            </a>
+                        </td>
+                        <td class="user-col">
+                            <a class="user-link" href="{{ url_for('user_profile', username=to_username) }}" target="_blank" rel="noopener" title="@{{ to_username }}">
+                                <span class="avatar" aria-hidden="true">
+                                    <img
+                                        src="{{ url_for('static', filename=to_profile_image if to_profile_image else 'images/default-avatar.svg') }}"
+                                        alt="@{{ to_username }} avatar"
+                                        loading="lazy"
+                                        onerror="this.onerror=null;this.src='{{ url_for('static', filename='images/default-avatar.svg') }}';"
+                                    >
+                                </span>
+                                <span class="user-label">{{ highlight_text('@' ~ to_username, q) }}</span>
+                            </a>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge {% if row.rating <= 2 %}status-blocked{% elif row.rating == 3 %}status-pending{% else %}status-completed{% endif %}">{{ row.rating }}/5</span>
+                        </td>
+                        <td class="review-col">
+                            {% if review_text %}
+                                <div class="review-text">{{ highlight_text(review_text, q) }}</div>
+                                {% if review_text|length > 80 %}
+                                    <button
+                                        class="review-see-more"
+                                        type="button"
+                                        data-from-user="@{{ from_username }}"
+                                        data-to-user="@{{ to_username }}"
+                                        data-review="{{ review_text|e }}"
+                                    >See more</button>
+                                {% endif %}
+                            {% else %}
+                                <div class="cell-flex">-</div>
+                            {% endif %}
+                        </td>
+                        <td class="text-center actions-col">
+                            <form class="feedback-delete-form" method="post" action="{{ url_for('admin_delete_feedback', rating_id=row.rating_id) }}" data-confirm="Are you sure you want to delete this review?">
+                                <button class="btn tiny danger" type="submit">Delete Review</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="5">No feedback records found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if pagination and pagination.pages > 1 %}
+        <div class="server-pagination">
+            {% if pagination.has_prev %}
+                <a class="btn tiny secondary" href="{{ url_for('admin_feedback_page', page=pagination.prev_num, rating=rating_filter, q=q) }}">Prev</a>
+            {% else %}
+                <button class="btn tiny secondary" type="button" disabled>Prev</button>
+            {% endif %}
+            <span>Page {{ pagination.page }} of {{ pagination.pages }}</span>
+            {% if pagination.has_next %}
+                <a class="btn tiny secondary" href="{{ url_for('admin_feedback_page', page=pagination.next_num, rating=rating_filter, q=q) }}">Next</a>
+            {% else %}
+                <button class="btn tiny secondary" type="button" disabled>Next</button>
+            {% endif %}
+        </div>
+    {% endif %}
+</section>
+
+<div id="review-modal" class="report-modal hidden" hidden>
+    <div class="report-modal-backdrop" data-close-review-modal="true"></div>
+    <div class="report-modal-card" role="dialog" aria-modal="true" aria-labelledby="reviewModalTitle">
+        <div class="report-modal-head">
+            <h3 id="reviewModalTitle">Full Review</h3>
+            <button class="btn tiny secondary" type="button" onclick="closeReviewModal()">Close</button>
+        </div>
+        <div class="report-modal-meta">
+            <div><strong>From:</strong> <span id="modalFromUser">-</span></div>
+            <div><strong>To:</strong> <span id="modalToUser">-</span></div>
+        </div>
+        <div id="full-review-text" class="report-modal-body"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    .feedback-filter-form {
+        grid-template-columns: minmax(260px, 1.8fr) minmax(180px, 1fr);
+        gap: 0.65rem;
+        align-items: end;
+    }
+
+    #feedbackResultsPanel.panel {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+    }
+
+    #feedbackResultsPanel .table-wrap {
+        margin: 0;
+        padding: 0;
+    }
+
+    .search-input-wrap {
+        position: relative;
+    }
+
+    .search-input-wrap input {
+        padding-right: 2rem;
+    }
+
+    .search-clear-btn {
+        position: absolute;
+        right: 0.38rem;
+        top: 50%;
+        transform: translateY(-50%);
+        border: 0;
+        background: transparent;
+        color: #506260;
+        font-size: 1rem;
+        line-height: 1;
+        cursor: pointer;
+        padding: 0.2rem;
+    }
+
+    .search-clear-btn:hover {
+        color: #0f766e;
+    }
+
+    #feedbackResultsPanel table {
+        width: 100%;
+        table-layout: fixed;
+    }
+
+    #feedbackResultsPanel tbody tr:hover {
+        background-color: #f3f0ff;
+    }
+
+    #feedbackResultsPanel tbody tr:hover td {
+        background-color: inherit;
+    }
+
+    .text-center {
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    .user-col {
+        text-align: left;
+        vertical-align: middle;
+    }
+
+    .user-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        max-width: 100%;
+    }
+
+    .user-label {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+
+    .review-col {
+        text-align: left;
+        vertical-align: middle;
+        max-width: 440px;
+    }
+
+    .review-text {
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+
+    .review-text {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .review-see-more {
+        border: 0;
+        background: transparent;
+        color: #0f766e;
+        font-size: 0.78rem;
+        font-weight: 700;
+        margin-top: 0.2rem;
+        padding: 0;
+        cursor: pointer;
+    }
+
+    .cell-flex {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+    }
+
+    .actions-col {
+        min-width: 160px;
+    }
+
+    mark.search-hit {
+        background: #fff3b0;
+        border-radius: 3px;
+        padding: 0 2px;
+    }
+
+    .report-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 1200;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+    }
+
+    .report-modal[hidden] {
+        display: none !important;
+    }
+
+    .report-modal-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(7, 20, 27, 0.45);
+    }
+
+    .report-modal-card {
+        position: relative;
+        width: min(640px, calc(100vw - 2rem));
+        max-height: calc(100vh - 2rem);
+        overflow: hidden;
+        border-radius: 12px;
+        border: 1px solid #dbe9e6;
+        background: #fff;
+        box-shadow: 0 16px 38px rgba(15, 23, 42, 0.2);
+        padding: 0.9rem;
+    }
+
+    .report-modal-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 0.4rem;
+    }
+
+    .report-modal-head h3 {
+        margin: 0;
+        font-size: 1rem;
+    }
+
+    .report-modal-meta {
+        font-size: 0.82rem;
+        color: #334155;
+        margin-bottom: 0.5rem;
+        display: grid;
+        gap: 0.25rem;
+    }
+
+    .report-modal-body {
+        max-height: 50vh;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+        color: #0f172a;
+        padding-right: 0.2rem;
+    }
+
+    .hidden {
+        display: none !important;
+    }
+
+    @media (max-width: 900px) {
+        .feedback-filter-form {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const form = document.getElementById("feedbackFilterForm");
+    const resultsPanel = document.getElementById("feedbackResultsPanel");
+    const searchInput = document.getElementById("feedbackSearchInput");
+    const clearButton = document.getElementById("clearFeedbackSearch");
+    const ratingSelect = document.getElementById("feedbackRatingSelect");
+    const reviewModal = document.getElementById("review-modal");
+    const fullReviewText = document.getElementById("full-review-text");
+    const modalFromUser = document.getElementById("modalFromUser");
+    const modalToUser = document.getElementById("modalToUser");
+
+    if (!form || !resultsPanel || !searchInput || !clearButton || !ratingSelect || !reviewModal || !fullReviewText || !modalFromUser || !modalToUser) {
+        return;
+    }
+
+    let debounceTimer = null;
+    let requestId = 0;
+
+    function buildQueryParams() {
+        const params = new URLSearchParams();
+        const q = searchInput.value.trim();
+        if (q) {
+            params.set("q", q);
+        }
+        if (ratingSelect.value && ratingSelect.value !== "all") {
+            params.set("rating", ratingSelect.value);
+        }
+        return params;
+    }
+
+    window.openReviewModal = function (text, fromUser, toUser) {
+        fullReviewText.innerText = text || "-";
+        modalFromUser.innerText = fromUser || "-";
+        modalToUser.innerText = toUser || "-";
+        reviewModal.hidden = false;
+        reviewModal.classList.remove("hidden");
+    };
+
+    window.closeReviewModal = function () {
+        reviewModal.classList.add("hidden");
+        reviewModal.hidden = true;
+        fullReviewText.innerText = "";
+        modalFromUser.innerText = "-";
+        modalToUser.innerText = "-";
+    };
+
+    function bindReviewButtons() {
+        resultsPanel.querySelectorAll(".review-see-more").forEach(function (button) {
+            button.addEventListener("click", function () {
+                window.openReviewModal(
+                    button.getAttribute("data-review") || "",
+                    button.getAttribute("data-from-user") || "",
+                    button.getAttribute("data-to-user") || ""
+                );
+            });
+        });
+    }
+
+    function bindDeleteActions() {
+        resultsPanel.querySelectorAll(".feedback-delete-form").forEach(function (formElement) {
+            formElement.addEventListener("submit", function (event) {
+                event.preventDefault();
+                const confirmMessage = formElement.getAttribute("data-confirm") || "Are you sure?";
+                if (!window.confirm(confirmMessage)) {
+                    return;
+                }
+
+                const targetUrl = formElement.getAttribute("action");
+                if (!targetUrl) {
+                    return;
+                }
+
+                fetch(targetUrl, {
+                    method: "POST",
+                    headers: { "X-Requested-With": "XMLHttpRequest" },
+                    credentials: "same-origin"
+                })
+                    .then(function (response) {
+                        if (!response.ok) {
+                            throw new Error("Failed to delete review");
+                        }
+                        return response.json();
+                    })
+                    .then(function (payload) {
+                        if (!payload || !payload.ok) {
+                            throw new Error("Failed to delete review");
+                        }
+                        fetchFilteredResults(true);
+                    })
+                    .catch(function () {});
+            });
+        });
+    }
+
+    function bindPaginationLinks() {
+        resultsPanel.querySelectorAll(".server-pagination a").forEach(function (link) {
+            link.addEventListener("click", function (event) {
+                event.preventDefault();
+                const href = link.getAttribute("href");
+                if (!href) {
+                    return;
+                }
+                refreshFeedback(href, true);
+            });
+        });
+    }
+
+    function bindDynamicControls() {
+        bindPaginationLinks();
+        bindDeleteActions();
+        bindReviewButtons();
+    }
+
+    function refreshFeedback(targetUrl, pushHistory) {
+        const currentRequest = ++requestId;
+
+        fetch(targetUrl, {
+            method: "GET",
+            headers: { "X-Requested-With": "XMLHttpRequest" },
+            credentials: "same-origin"
+        })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error("Failed to refresh feedback list");
+                }
+                return response.text();
+            })
+            .then(function (htmlText) {
+                if (currentRequest !== requestId) {
+                    return;
+                }
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(htmlText, "text/html");
+                const nextPanel = doc.getElementById("feedbackResultsPanel");
+                if (!nextPanel) {
+                    return;
+                }
+                resultsPanel.innerHTML = nextPanel.innerHTML;
+                bindDynamicControls();
+                if (pushHistory) {
+                    window.history.replaceState({}, "", targetUrl);
+                }
+            })
+            .catch(function () {});
+    }
+
+    function fetchFilteredResults(pushHistory) {
+        const params = buildQueryParams();
+        params.delete("page");
+        const queryString = params.toString();
+        const targetUrl = "{{ url_for('admin_feedback_page') }}" + (queryString ? ("?" + queryString) : "");
+        refreshFeedback(targetUrl, pushHistory);
+    }
+
+    function scheduleFetch() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(function () {
+            fetchFilteredResults(true);
+        }, 350);
+    }
+
+    searchInput.addEventListener("input", function () {
+        const hasValue = searchInput.value.trim().length > 0;
+        clearButton.hidden = !hasValue;
+        scheduleFetch();
+    });
+
+    clearButton.addEventListener("click", function () {
+        searchInput.value = "";
+        clearButton.hidden = true;
+        fetchFilteredResults(true);
+    });
+
+    ratingSelect.addEventListener("change", function () {
+        fetchFilteredResults(true);
+    });
+
+    reviewModal.addEventListener("click", function (event) {
+        const target = event.target;
+        if (target && target.getAttribute && target.getAttribute("data-close-review-modal") === "true") {
+            window.closeReviewModal();
+        }
+    });
+
+    document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && !reviewModal.hidden) {
+            window.closeReviewModal();
+        }
+    });
+
+    bindDynamicControls();
+});
+</script>
+{% endblock %}

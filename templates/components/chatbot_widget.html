@@ -1,0 +1,60 @@
+<div
+    class="skillswap-chat"
+    data-authenticated="{{ '1' if g.user else '0' }}"
+    data-role="{{ g.user.role if g.user else 'guest' }}"
+    data-endpoint="{{ request.endpoint or '' }}"
+>
+    <button id="chat-launcher" class="chat-launcher" type="button" aria-label="Open SkillSwap assistant" aria-expanded="false">
+        <svg id="icon-chat" class="launcher-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+    </button>
+
+    <section id="chat-window" class="chat-window" role="dialog" aria-modal="false" aria-label="SkillSwap AI assistant">
+        <header class="chat-header">
+            <div>
+                <h3>SkillSwap Assistant</h3>
+            </div>
+            <div class="chat-tools" role="group" aria-label="Chat controls">
+                <button id="refresh-btn" class="chat-tool" type="button" aria-label="Refresh chat" title="Refresh chat">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M20 12a8 8 0 1 1-2.34-5.66" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M20 4v6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+                <button id="minimize-btn" class="chat-tool" type="button" aria-label="Minimize chat" title="Minimize chat">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+                <button id="close-btn" class="chat-tool chat-close" type="button" aria-label="End chat" title="End chat">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <div id="chat-body" class="chat-body">
+            <div id="empty-state" class="chat-empty">
+                <strong>Need help in SkillSwap?</strong>
+                <span>Type your question to start chatting.</span>
+            </div>
+            <div id="typing-indicator" class="typing-indicator" aria-live="polite">
+                <div class="typing-bubble">
+                    <span></span><span></span><span></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="chat-input-wrap">
+            <input id="msg-input" type="text" maxlength="500" placeholder="Type your message..." aria-label="Message input">
+            <button id="send-btn" type="button" aria-label="Send message">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M22 2L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                </svg>
+            </button>
+        </div>
+    </section>
+</div>

@@ -1,0 +1,388 @@
+{% extends 'user/base.html' %}
+{% block content %}
+<section class="panel profile-card profile-identity-card">
+    <div class="profile-avatar-wrap">
+        <img class="profile-avatar" src="{{ url_for('static', filename=profile_user.profile_image_path) }}" alt="{{ profile_user.name }} profile image" onerror="this.onerror=null;this.src='{{ url_for('static', filename='images/default-avatar.svg') }}';">
+        <span class="availability-badge availability-{{ profile_user.availability_label|lower }}">
+            {{ profile_user.availability_label }}
+        </span>
+        {% if g.user.user_id == profile_user.user_id %}
+            <div class="profile-avatar-actions">
+                <a class="btn" href="{{ url_for('profile_edit') }}">Edit Profile</a>
+            </div>
+        {% endif %}
+    </div>
+    <div class="profile-main-info">
+        <h2 class="profile-display-name">{{ profile_user.name }} <span class="profile-inline-username">(@{{ profile_user.username }})</span></h2>
+        <p class="muted profile-bio">{{ profile_user.bio if profile_user.bio else 'No bio added yet.' }}</p>
+
+        <div class="profile-kpi-row">
+            <article class="profile-kpi">
+                <p>Rating</p>
+                <strong>
+                    {% if avg_rating is not none %}
+                        <span class="rating-inline-wrap">
+                            <svg class="profile-rating-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
+                                <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"></path>
+                            </svg>
+                            {{ '%.2f'|format(avg_rating) }}
+                        </span>
+                    {% else %}
+                        N/A
+                    {% endif %}
+                </strong>
+            </article>
+            <article class="profile-kpi">
+                <p>Completed Exchanges</p>
+                <strong>{{ completed_exchanges }}</strong>
+            </article>
+            <article class="profile-kpi">
+                <p>Response Rate</p>
+                <strong>{{ response_rate ~ '%' if response_rate is not none else 'No data yet' }}</strong>
+            </article>
+        </div>
+
+        <div class="profile-meta-row">
+            {% if show_email %}
+                <span class="chip">{{ profile_user.email }}</span>
+            {% endif %}
+            {% if profile_user.location %}
+                <span class="chip">{{ profile_user.location }}</span>
+            {% endif %}
+            <span class="chip">Joined: {{ profile_user.created_at.strftime('%Y-%m-%d') }}</span>
+            <span class="chip">Profile Complete: {{ profile_completion }}%</span>
+        </div>
+        <div class="inline-actions profile-header-actions">
+            {% if g.user.user_id != profile_user.user_id %}
+                {% if messaging_blocked %}
+                    <button class="btn tertiary" type="button" disabled aria-disabled="true">Send Message</button>
+                    <span class="chip muted">User Blocked</span>
+                {% else %}
+                    <a class="btn tertiary" href="{{ url_for('messages_thread', username=profile_user.username) }}">Send Message</a>
+                {% endif %}
+                <button class="btn danger open-report-modal" type="button" data-user-id="{{ profile_user.user_id }}">Report User</button>
+                <button class="btn warning open-block-modal" type="button">
+                    {{ 'Unblock User' if blocked_by_me else 'Block User' }}
+                </button>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<section class="panel">
+    <h2>Skills</h2>
+    <div class="two-col">
+        <div class="skills-group-card">
+            <h3>Offered Skills ({{ offered_details|length }})</h3>
+            {% if offered_details %}
+                <div class="skill-card-grid">
+                    {% for item in offered_details %}
+                        <article class="skill-detail-card">
+                            <strong>
+                                <svg class="skill-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                                    <path d="M12 3l7 9-7 9-7-9 7-9z"></path>
+                                    <path d="M9 12h6"></path>
+                                </svg>
+                                {{ item.skill.skill_name }}
+                            </strong>
+                            <span>
+                                <svg class="skill-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                                    <path d="M20.6 13.4L11.4 22.6a2 2 0 0 1-2.8 0L1.4 15.4a2 2 0 0 1 0-2.8l9.2-9.2a2 2 0 0 1 1.4-.6H20a2 2 0 0 1 2 2v8a2 2 0 0 1-.6 1.4z"></path>
+                                    <circle cx="16" cy="8" r="1.2"></circle>
+                                </svg>
+                                Category: {{ item.skill.category if item.skill.category else 'Uncategorized' }}
+                            </span>
+                            <span>
+                                <svg class="skill-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                                    <path d="M3 20h18"></path>
+                                    <path d="M7 20v-4"></path>
+                                    <path d="M12 20v-8"></path>
+                                    <path d="M17 20v-12"></path>
+                                </svg>
+                                Level: {{ item.level }}
+                            </span>
+                        </article>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="muted">No skills added yet</p>
+            {% endif %}
+        </div>
+        <div class="skills-group-card">
+            <h3>Wanted Skills ({{ wanted_details|length }})</h3>
+            {% if wanted_details %}
+                <div class="skill-card-grid">
+                    {% for item in wanted_details %}
+                        <article class="skill-detail-card">
+                            <strong>
+                                <svg class="skill-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                                    <path d="M12 3l7 9-7 9-7-9 7-9z"></path>
+                                    <path d="M9 12h6"></path>
+                                </svg>
+                                {{ item.skill.skill_name }}
+                            </strong>
+                            <span>
+                                <svg class="skill-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                                    <path d="M20.6 13.4L11.4 22.6a2 2 0 0 1-2.8 0L1.4 15.4a2 2 0 0 1 0-2.8l9.2-9.2a2 2 0 0 1 1.4-.6H20a2 2 0 0 1 2 2v8a2 2 0 0 1-.6 1.4z"></path>
+                                    <circle cx="16" cy="8" r="1.2"></circle>
+                                </svg>
+                                Category: {{ item.skill.category if item.skill.category else 'Uncategorized' }}
+                            </span>
+                            <span>
+                                <svg class="skill-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                                    <path d="M3 20h18"></path>
+                                    <path d="M7 20v-4"></path>
+                                    <path d="M12 20v-8"></path>
+                                    <path d="M17 20v-12"></path>
+                                </svg>
+                                Level: {{ item.level }}
+                            </span>
+                        </article>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="muted">No skills added yet</p>
+            {% endif %}
+        </div>
+    </div>
+
+</section>
+
+<section class="panel">
+    <h2>Ratings & Feedback</h2>
+    <p>
+        <strong>{{ avg_rating if avg_rating is not none else 'N/A' }}</strong>
+        <span class="feedback-stars">{% if avg_rating %}{{ '★' * (avg_rating|round(0, 'floor')|int) }}{% endif %}</span>
+        <span class="muted">({{ total_reviews }} review{{ '' if total_reviews == 1 else 's' }})</span>
+    </p>
+    {% if feedback %}
+        <ul class="feedback-list">
+            {% for rating, from_name in feedback %}
+                <li class="review-item {% if loop.index > 3 %}review-hidden{% endif %}">
+                    <strong>{{ from_name }}</strong>
+                    <span class="feedback-stars">{{ '★' * rating.rating }}{{ '☆' * (5 - rating.rating) }}</span>
+                    <p>{{ rating.feedback if rating.feedback else 'No written feedback.' }}</p>
+                </li>
+            {% endfor %}
+        </ul>
+        {% if total_reviews > 3 %}
+            <button id="loadMoreReviewsBtn" class="btn secondary tiny" type="button">See More</button>
+        {% endif %}
+    {% else %}
+        <p class="muted">No reviews yet</p>
+    {% endif %}
+</section>
+
+<section class="panel">
+    <h2>Activity</h2>
+    <div class="stats">
+        <article>
+            <h3>{{ total_requests }}</h3>
+            <p>Total Requests</p>
+        </article>
+        <article>
+            <h3>{{ completed_exchanges }}</h3>
+            <p>Completed Exchanges</p>
+        </article>
+        <article>
+            <h3>{{ accepted_requests }}</h3>
+            <p>Accepted Requests</p>
+        </article>
+        <article>
+            <h3>{{ rejected_requests }}</h3>
+            <p>Rejected Requests</p>
+        </article>
+        <article>
+            <h3>{{ pending_requests }}</h3>
+            <p>Pending Requests</p>
+        </article>
+    </div>
+</section>
+
+<section class="panel">
+    <h2>Recent Exchanges</h2>
+    {% if recent_exchange_rows %}
+        <ul class="skill-list recent-exchange-list">
+            {% for row in recent_exchange_rows %}
+                <li class="{% if loop.index > 3 %}exchange-hidden{% endif %}">
+                    <span class="recent-exchange-headline">
+                        You exchanged <strong>{{ row.my_skill }}</strong>
+                        <svg class="activity-swap-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                            <path d="M4 7h11"></path>
+                            <path d="M12 4l3 3-3 3"></path>
+                            <path d="M20 17H9"></path>
+                            <path d="M12 14l-3 3 3 3"></path>
+                        </svg>
+                        <strong>{{ row.partner_skill }}</strong>
+                        with @{{ row.partner_username }}
+                    </span>
+                    <span>Time: {{ row.time_ago }}</span>
+                </li>
+            {% endfor %}
+        </ul>
+        {% if recent_exchange_rows|length > 3 %}
+            <div class="recent-exchange-load-more-wrap">
+                <button id="loadMoreExchangesBtn" class="btn secondary tiny" type="button">See More</button>
+            </div>
+        {% endif %}
+    {% else %}
+        <p class="muted">No activity in last 30 days</p>
+    {% endif %}
+</section>
+
+{% if g.user.user_id != profile_user.user_id %}
+<section class="panel">
+    <h2>Actions</h2>
+    {% if my_offered and their_offered %}
+        <form method="post" action="{{ url_for('send_request_to_user', user_id=profile_user.user_id) }}" class="form-grid inline-form">
+            <label>Your Offered Skill
+                <select name="offered_skill_id" required {% if messaging_blocked %}disabled aria-disabled="true"{% endif %}>
+                    {% for row, skill in my_offered %}
+                        <option value="{{ skill.skill_id }}">{{ skill.skill_name }} ({{ row.level }})</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>Requested Skill
+                <select name="requested_skill_id" required {% if messaging_blocked %}disabled aria-disabled="true"{% endif %}>
+                    {% for row, skill in their_offered %}
+                        <option value="{{ skill.skill_id }}">{{ skill.skill_name }} ({{ row.level }})</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <div class="inline-actions">
+                <button class="btn" type="submit" {% if messaging_blocked %}disabled aria-disabled="true"{% endif %}>Request Exchange</button>
+                {% if messaging_blocked %}
+                    <button class="btn tertiary" type="button" disabled aria-disabled="true">Send Message</button>
+                    <span class="chip muted">User Blocked</span>
+                {% else %}
+                    <a class="btn tertiary" href="{{ url_for('messages_thread', username=profile_user.username) }}">Send Message</a>
+                {% endif %}
+            </div>
+            {% if messaging_blocked %}
+                <p class="muted">Requests are disabled while one user has blocked the other.</p>
+            {% endif %}
+        </form>
+    {% else %}
+        <div class="empty-state compact">
+            <p>Cannot request yet. Both users need offered skills.</p>
+            <a class="btn tiny" href="{{ url_for('skills') }}">Add Skill</a>
+        </div>
+    {% endif %}
+</section>
+{% endif %}
+
+<dialog id="reportModal" class="report-modal">
+    <form method="post" action="{{ url_for('create_report') }}" class="form-grid" id="reportForm" enctype="multipart/form-data">
+        <input type="hidden" id="reportUserIdInput" name="reported_user_id" required>
+        <h3>Report User</h3>
+        <div id="report-error" class="report-error hidden"></div>
+        <label>Reason
+            <select name="reason" required>
+                {% for reason in report_reasons %}
+                    <option value="{{ reason }}">{{ reason }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Description
+            <textarea name="description" rows="4" maxlength="1000" placeholder="Describe what happened (optional)"></textarea>
+        </label>
+        <label>Attach proof (optional)
+            <input type="file" id="reportAttachment" name="attachments" multiple>
+        </label>
+        <div class="inline-actions">
+            <button class="btn" type="submit">Submit Report</button>
+            <button class="btn secondary close-report-modal" type="button">Cancel</button>
+        </div>
+    </form>
+</dialog>
+
+<style>
+    .report-error {
+        background-color: #ffe5e5;
+        color: #b30000;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 14px;
+        margin-bottom: 10px;
+        text-align: center;
+        transition: opacity 0.3s ease;
+    }
+
+    .hidden {
+        display: none;
+    }
+</style>
+
+{% if g.user.user_id != profile_user.user_id %}
+<dialog id="blockUserModal" class="report-modal">
+    <form method="post" action="{{ url_for('toggle_user_block', username=profile_user.username) }}" class="form-grid" id="blockUserForm">
+        <h3>{{ 'Unblock User' if blocked_by_me else 'Block User' }}</h3>
+        <p>
+            {% if blocked_by_me %}
+                Do you want to unblock this user?
+            {% else %}
+                Are you sure you want to block this user?
+            {% endif %}
+        </p>
+        <div class="inline-actions">
+            <button class="btn warning" type="submit">{{ 'Confirm Unblock' if blocked_by_me else 'Confirm Block' }}</button>
+            <button class="btn secondary close-block-modal" type="button">Cancel</button>
+        </div>
+    </form>
+</dialog>
+{% endif %}
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    var loadMoreReviewsBtn = document.getElementById("loadMoreReviewsBtn");
+    if (loadMoreReviewsBtn) {
+        loadMoreReviewsBtn.addEventListener("click", function () {
+            var hiddenRows = document.querySelectorAll(".review-item.review-hidden");
+            var revealCount = 0;
+            hiddenRows.forEach(function (row) {
+                if (revealCount < 3) {
+                    row.classList.remove("review-hidden");
+                    revealCount += 1;
+                }
+            });
+            if (!document.querySelector(".review-item.review-hidden")) {
+                loadMoreReviewsBtn.remove();
+            }
+        });
+    }
+
+    var loadMoreExchangesBtn = document.getElementById("loadMoreExchangesBtn");
+    if (loadMoreExchangesBtn) {
+        loadMoreExchangesBtn.addEventListener("click", function () {
+            var hiddenExchanges = document.querySelectorAll(".recent-exchange-list .exchange-hidden");
+            var revealCount = 0;
+            hiddenExchanges.forEach(function (row) {
+                if (revealCount < 3) {
+                    row.classList.remove("exchange-hidden");
+                    revealCount += 1;
+                }
+            });
+            if (!document.querySelector(".recent-exchange-list .exchange-hidden")) {
+                loadMoreExchangesBtn.remove();
+            }
+        });
+    }
+
+    var blockUserModal = document.getElementById("blockUserModal");
+    if (blockUserModal) {
+        document.querySelectorAll(".open-block-modal").forEach(function (button) {
+            button.addEventListener("click", function () {
+                blockUserModal.showModal();
+            });
+        });
+
+        blockUserModal.querySelectorAll(".close-block-modal").forEach(function (button) {
+            button.addEventListener("click", function () {
+                blockUserModal.close();
+            });
+        });
+    }
+});
+</script>
+{% endblock %}
+

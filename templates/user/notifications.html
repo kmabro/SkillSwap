@@ -1,0 +1,39 @@
+{% extends 'user/base.html' %}
+{% block content %}
+<section class="panel">
+    <div class="inline-actions" style="justify-content: space-between; width: 100%;">
+        <h2>Notifications</h2>
+        <form method="post" action="{{ url_for('mark_all_notifications_read') }}">
+            <button class="btn tiny secondary" type="submit">Mark all as read</button>
+        </form>
+    </div>
+    {% if notifications %}
+        <ul class="feedback-list notifications-list">
+            {% for n in notifications %}
+                <li class="{% if not n.is_read %}notif-unread{% endif %}">
+                    <strong>{{ n.notif_type|replace('_', ' ')|title }}</strong>
+                    <p>{{ n.message }}</p>
+                    <div class="inline-actions">
+                        <span class="muted">{{ n.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                        {% if n.link %}
+                            <form method="post" action="{{ url_for('mark_notification_read', notification_id=n.notification_id) }}">
+                                <button class="btn tiny secondary" type="submit">Open</button>
+                            </form>
+                        {% elif not n.is_read %}
+                            <form method="post" action="{{ url_for('mark_notification_read', notification_id=n.notification_id) }}">
+                                <button class="btn tiny secondary" type="submit">Mark Read</button>
+                            </form>
+                        {% endif %}
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <div class="empty-state compact">
+            <p>No notifications yet</p>
+            <a class="btn tiny" href="{{ url_for('matches') }}">Find Matches</a>
+        </div>
+    {% endif %}
+</section>
+{% endblock %}
+

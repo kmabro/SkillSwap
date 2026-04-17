@@ -1,0 +1,221 @@
+{% extends 'user/base.html' %}
+{% block content %}
+<section class="panel">
+    <h2>Welcome, {{ g.user.name }}</h2>
+    <div class="stats">
+        <article>
+            <h3>{{ incoming_pending }}</h3>
+            <p>Incoming Requests</p>
+        </article>
+        <article>
+            <h3>{{ outgoing_pending }}</h3>
+            <p>Outgoing Requests</p>
+        </article>
+        <article>
+            <h3>{{ completed_count }}</h3>
+            <p>Completed Exchanges</p>
+        </article>
+        <article>
+            <h3>{{ avg_rating if avg_rating is not none else 'N/A' }}</h3>
+            <p>Average Rating</p>
+        </article>
+        <article>
+            <h3>{{ weekly_summary.requests }}</h3>
+            <p>Weekly Requests</p>
+        </article>
+        <article>
+            <h3>{{ weekly_summary.completed }}</h3>
+            <p>Weekly Completed</p>
+        </article>
+        <article>
+            <h3>{{ weekly_summary.rejected }}</h3>
+            <p>Weekly Rejected</p>
+        </article>
+        <article>
+            <h3>{{ most_used_skill if most_used_skill else 'N/A' }}</h3>
+            <p>Most Used Skill</p>
+        </article>
+    </div>
+
+    <div class="dashboard-top-actions">
+        <form method="post" action="{{ url_for('toggle_availability') }}" class="status-controls" id="statusControlForm">
+            <details class="status-dropdown" id="statusDropdown">
+                <summary>
+                    <span class="status-label">Status:</span>
+                    <span class="availability-badge availability-{{ g.user.availability_label|lower }}">{{ g.user.availability_label }}</span>
+                    <span class="status-caret" aria-hidden="true">&#9662;</span>
+                </summary>
+                <div class="status-options" role="menu" aria-label="Set availability">
+                    {% for option in availability_statuses %}
+                        <button
+                            type="submit"
+                            class="status-option{% if option == g.user.availability_label %} active{% endif %}"
+                            name="availability_status"
+                            value="{{ option }}"
+                        >
+                            {{ option }}
+                        </button>
+                    {% endfor %}
+                </div>
+            </details>
+        </form>
+        <a class="dashboard-action-card profile-action-card" href="{{ url_for('profile_edit') }}">
+            <span class="action-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M12 20h9"></path>
+                    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"></path>
+                </svg>
+            </span>
+            <strong>Edit Profile</strong>
+        </a>
+        <a class="dashboard-action-card profile-action-card" href="{{ url_for('user_profile', username=g.user.username) }}">
+            <span class="action-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M20 21a8 8 0 0 0-16 0"></path>
+                    <circle cx="12" cy="8" r="4"></circle>
+                </svg>
+            </span>
+            <strong>View Profile</strong>
+        </a>
+    </div>
+</section>
+
+<section class="panel">
+    <h2>Recent Feedback</h2>
+    {% if feedback_preview %}
+        <ul class="feedback-list" id="feedbackList" data-expanded="0">
+            {% for item in feedback_preview %}
+                <li>
+                    <div class="feedback-head">
+                        <strong>{{ item.from_name }}</strong>
+                        <small class="muted">{{ item.time_ago }}</small>
+                    </div>
+                    <span class="feedback-stars">{{ '★' * item.rating.rating }}{{ '☆' * (5 - item.rating.rating) }}</span>
+                    <p>{{ item.rating.feedback if item.rating.feedback else 'No written feedback.' }}</p>
+                </li>
+            {% endfor %}
+            {% for item in feedback_all[3:] %}
+                <li class="review-hidden dashboard-feedback-extra">
+                    <div class="feedback-head">
+                        <strong>{{ item.from_name }}</strong>
+                        <small class="muted">{{ item.time_ago }}</small>
+                    </div>
+                    <span class="feedback-stars">{{ '★' * item.rating.rating }}{{ '☆' * (5 - item.rating.rating) }}</span>
+                    <p>{{ item.rating.feedback if item.rating.feedback else 'No written feedback.' }}</p>
+                </li>
+            {% endfor %}
+        </ul>
+        {% if feedback_has_more %}
+            <div class="top-users-actions" style="justify-content: flex-start;">
+                <button class="btn tiny secondary" id="feedbackViewMoreBtn" type="button">View More</button>
+            </div>
+        {% endif %}
+    {% else %}
+        <div class="empty-state compact">
+            <p>No ratings yet<br>Complete exchanges to receive feedback.</p>
+            <a class="btn tiny" href="{{ url_for('matches') }}">Find Matches</a>
+        </div>
+    {% endif %}
+</section>
+
+<section class="panel">
+    <h2>Requests Over Time (Last 7 Days)</h2>
+    <div class="trend-grid">
+        {% for row in trend_data %}
+            <article class="trend-card">
+                <strong>{{ row.label }}</strong>
+                <div class="trend-bar-wrap">
+                    <span class="trend-bar requests" style="width: {{ row.request_pct }}%"></span>
+                </div>
+                <small>Requests: {{ row.requests }}</small>
+                <div class="trend-bar-wrap">
+                    <span class="trend-bar completed" style="width: {{ row.completed_pct }}%"></span>
+                </div>
+                <small>Completed: {{ row.completed }}</small>
+                <div class="trend-bar-wrap">
+                    <span class="trend-bar rejected" style="width: {{ row.rejected_pct }}%"></span>
+                </div>
+                <small>Rejected: {{ row.rejected }}</small>
+            </article>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="panel">
+    <h2>Recent Activity</h2>
+    {% if recent_activity %}
+        <ul class="skill-list">
+            {% for req in recent_activity %}
+                <li>
+                    <span class="activity-pair">
+                        {% if req.sender_id == g.user.user_id %}
+                            <span>You</span>
+                            <svg class="activity-swap-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                                <path d="M4 7h11"></path>
+                                <path d="M12 4l3 3-3 3"></path>
+                                <path d="M20 17H9"></path>
+                                <path d="M12 14l-3 3 3 3"></path>
+                            </svg>
+                            <span>{{ req.receiver.username }}</span>
+                        {% elif req.receiver_id == g.user.user_id %}
+                            <span>{{ req.sender.username }}</span>
+                            <svg class="activity-swap-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                                <path d="M4 7h11"></path>
+                                <path d="M12 4l3 3-3 3"></path>
+                                <path d="M20 17H9"></path>
+                                <path d="M12 14l-3 3 3 3"></path>
+                            </svg>
+                            <span>You</span>
+                        {% else %}
+                            <span>{{ req.sender.username }}</span>
+                            <svg class="activity-swap-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                                <path d="M4 7h11"></path>
+                                <path d="M12 4l3 3-3 3"></path>
+                                <path d="M20 17H9"></path>
+                                <path d="M12 14l-3 3 3 3"></path>
+                            </svg>
+                            <span>{{ req.receiver.username }}</span>
+                        {% endif %}
+                    </span>
+                    <span>{{ req.status|replace('_', ' ')|title }} | {{ req.updated_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <div class="empty-state compact">
+            <p>No activity in last 30 days</p>
+            <div class="inline-actions">
+                <a class="btn tiny" href="{{ url_for('skills') }}">Add Skill</a>
+                <a class="btn tiny secondary" href="{{ url_for('matches') }}">Find Matches</a>
+                <a class="btn tiny secondary" href="{{ url_for('search') }}">Search Users</a>
+            </div>
+        </div>
+    {% endif %}
+</section>
+
+<section class="panel">
+    <h2>Quick Actions</h2>
+    <div class="dashboard-actions-grid">
+        {% for action in quick_actions %}
+            <a class="dashboard-action-card" href="{{ action.url }}">
+                <span class="action-icon" aria-hidden="true">
+                    {% if action.label == 'Add Skills' %}
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
+                    {% elif action.label == 'Find Matches' %}
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="10" r="3"></circle><circle cx="16" cy="10" r="3"></circle><path d="M5.5 18c1.2-2.2 3.1-3.3 5.7-3.3"></path><path d="M12.8 14.7c2.6 0 4.5 1.1 5.7 3.3"></path><path d="M10.8 10h2.4"></path></svg>
+                    {% elif action.label == 'Search Users' %}
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10" cy="8" r="3.2"></circle><path d="M4.8 18.3a5.6 5.6 0 0 1 10.4 0"></path><circle cx="17.5" cy="17.5" r="2.5"></circle><path d="M19.4 19.4L22 22"></path></svg>
+                    {% elif action.label == 'View Requests' %}
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16"></path><path d="M7 3h10"></path><rect x="3" y="6" width="18" height="14" rx="2"></rect><path d="M9 11h6"></path><path d="M9 15h6"></path></svg>
+                    {% else %}
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"></circle><path d="M8 12h8"></path></svg>
+                    {% endif %}
+                </span>
+                <strong>{{ action.label }}</strong>
+            </a>
+        {% endfor %}
+    </div>
+    <p class="muted" style="margin-top: 0.7rem;">Add at least 2 skills to get better matches. Complete your profile for more trust.</p>
+</section>
+{% endblock %}
+

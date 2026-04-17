@@ -1,0 +1,303 @@
+{% extends 'admin/base_admin.html' %}
+{% block admin_content %}
+<section class="panel">
+    <form id="skillsFilterForm" method="get" class="form-grid skills-filter-form">
+        <label>Search Skill
+            <div class="search-input-wrap">
+                <input id="skillSearchInput" type="text" name="q" value="{{ q }}" placeholder="Search by skill name" autocomplete="off">
+                <button id="clearSkillSearch" class="search-clear-btn" type="button" aria-label="Clear search" {% if not q %}hidden{% endif %}>x</button>
+            </div>
+        </label>
+        <label>Category
+            <select name="category" id="skillCategorySelect">
+                <option value="all" {% if category_filter == 'all' %}selected{% endif %}>All Categories</option>
+                {% for category in category_options %}
+                    <option value="{{ category.id }}" {% if category_filter == category.id|string %}selected{% endif %}>{{ category.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Status
+            <select name="status" id="skillStatusSelect">
+                <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All</option>
+                <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+                <option value="blocked" {% if status_filter == 'blocked' %}selected{% endif %}>Blocked</option>
+            </select>
+        </label>
+    </form>
+</section>
+
+<section class="panel" id="skillsResultsPanel">
+    <div class="table-wrap">
+        <table data-enhance="true" data-server-pagination="true">
+            <colgroup>
+                <col style="width: 34%;">
+                <col style="width: 26%;">
+                <col style="width: 14%;">
+                <col style="width: 12%;">
+                <col style="width: 14%;">
+            </colgroup>
+            <thead>
+                <tr>
+                    <th>Skill Name</th>
+                    <th>Category</th>
+                    <th>Users Count</th>
+                    <th>Status</th>
+                    <th class="no-sort">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for skill in skills %}
+                    {% set usage_count = users_count_map.get(skill.skill_id, 0) %}
+                    <tr>
+                        <td><strong>{{ highlight_text(skill.skill_name, q) }}</strong></td>
+                        <td>{{ highlight_text(skill.category_name, q) }}</td>
+                        <td title="Used by {{ usage_count }} users">{{ usage_count }} {{ 'User' if usage_count == 1 else 'Users' }}</td>
+                        <td>
+                            {% if (skill.status or 'active')|lower == 'blocked' %}
+                                <span class="badge status-blocked">Blocked</span>
+                            {% else %}
+                                <span class="badge status-active">Active</span>
+                            {% endif %}
+                        </td>
+                        <td class="actions-cell">
+                            <div class="inline-actions skills-inline-actions">
+                                <form method="post" action="{{ url_for('admin_toggle_skill_status', skill_id=skill.skill_id) }}">
+                                    {% if (skill.status or 'active')|lower == 'blocked' %}
+                                        <button class="btn tiny secondary" type="submit">Unblock</button>
+                                    {% else %}
+                                        <button class="btn tiny" type="submit">Block</button>
+                                    {% endif %}
+                                </form>
+                                <form method="post" action="{{ url_for('admin_delete_skill', skill_id=skill.skill_id) }}" onsubmit="return confirm('Are you sure you want to delete this skill?');">
+                                    <button class="btn tiny danger" type="submit">Delete</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="5">No skills found</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if pagination and pagination.pages > 1 %}
+        <div class="server-pagination">
+            {% if pagination.has_prev %}
+                <a class="btn tiny secondary" href="{{ url_for('admin_skills_page', page=pagination.prev_num, q=q, status=status_filter, category=category_filter) }}">Prev</a>
+            {% else %}
+                <button class="btn tiny secondary" type="button" disabled>Prev</button>
+            {% endif %}
+            <span>Page {{ pagination.page }} of {{ pagination.pages }}</span>
+            {% if pagination.has_next %}
+                <a class="btn tiny secondary" href="{{ url_for('admin_skills_page', page=pagination.next_num, q=q, status=status_filter, category=category_filter) }}">Next</a>
+            {% else %}
+                <button class="btn tiny secondary" type="button" disabled>Next</button>
+            {% endif %}
+        </div>
+    {% endif %}
+</section>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    .skills-filter-form {
+        grid-template-columns: minmax(260px, 1.8fr) minmax(200px, 1fr) minmax(160px, 1fr);
+        gap: 0.65rem;
+        align-items: end;
+    }
+
+    .search-input-wrap {
+        position: relative;
+    }
+
+    .search-input-wrap input {
+        padding-right: 2rem;
+    }
+
+    .search-clear-btn {
+        position: absolute;
+        right: 0.38rem;
+        top: 50%;
+        transform: translateY(-50%);
+        border: 0;
+        background: transparent;
+        color: #506260;
+        font-size: 1rem;
+        line-height: 1;
+        cursor: pointer;
+        padding: 0.2rem;
+    }
+
+    .search-clear-btn:hover {
+        color: #0f766e;
+    }
+
+    mark.search-hit {
+        background: #fff3b0;
+        border-radius: 3px;
+        padding: 0 2px;
+    }
+
+    .actions-cell {
+        white-space: nowrap;
+        min-width: 150px;
+    }
+
+    .skills-inline-actions {
+        display: inline-flex;
+        flex-wrap: nowrap;
+        gap: 0.35rem;
+        align-items: center;
+    }
+
+    .skills-inline-actions form {
+        margin: 0;
+    }
+
+    .skills-inline-actions .btn {
+        height: 30px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        white-space: nowrap;
+    }
+
+    #skillsResultsPanel table {
+        width: 100%;
+        table-layout: fixed;
+    }
+
+    #skillsResultsPanel tbody td:nth-child(1),
+    #skillsResultsPanel tbody td:nth-child(2) {
+        white-space: normal;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+
+    @media (max-width: 900px) {
+        .skills-filter-form {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const form = document.getElementById("skillsFilterForm");
+    const resultsPanel = document.getElementById("skillsResultsPanel");
+    const searchInput = document.getElementById("skillSearchInput");
+    const clearButton = document.getElementById("clearSkillSearch");
+    const categorySelect = document.getElementById("skillCategorySelect");
+    const statusSelect = document.getElementById("skillStatusSelect");
+
+    if (!form || !resultsPanel || !searchInput || !clearButton || !categorySelect || !statusSelect) {
+        return;
+    }
+
+    let debounceTimer = null;
+    let requestId = 0;
+
+    function buildQueryParams() {
+        const params = new URLSearchParams();
+        const q = searchInput.value.trim();
+        if (q) {
+            params.set("q", q);
+        }
+        if (categorySelect.value && categorySelect.value !== "all") {
+            params.set("category", categorySelect.value);
+        }
+        if (statusSelect.value && statusSelect.value !== "all") {
+            params.set("status", statusSelect.value);
+        }
+        return params;
+    }
+
+    function refreshSkills(targetUrl, pushHistory) {
+        const currentRequest = ++requestId;
+
+        fetch(targetUrl, {
+            method: "GET",
+            headers: { "X-Requested-With": "XMLHttpRequest" },
+            credentials: "same-origin"
+        })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error("Failed to refresh skills list");
+                }
+                return response.text();
+            })
+            .then(function (htmlText) {
+                if (currentRequest !== requestId) {
+                    return;
+                }
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(htmlText, "text/html");
+                const nextPanel = doc.getElementById("skillsResultsPanel");
+                if (!nextPanel) {
+                    return;
+                }
+                resultsPanel.innerHTML = nextPanel.innerHTML;
+                bindPaginationLinks();
+                if (pushHistory) {
+                    window.history.replaceState({}, "", targetUrl);
+                }
+            })
+            .catch(function () {});
+    }
+
+    function fetchFilteredResults(pushHistory) {
+        const params = buildQueryParams();
+        params.delete("page");
+        const queryString = params.toString();
+        const targetUrl = "{{ url_for('admin_skills_page') }}" + (queryString ? ("?" + queryString) : "");
+        refreshSkills(targetUrl, pushHistory);
+    }
+
+    function scheduleFetch() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(function () {
+            fetchFilteredResults(true);
+        }, 350);
+    }
+
+    function bindPaginationLinks() {
+        resultsPanel.querySelectorAll(".server-pagination a").forEach(function (link) {
+            link.addEventListener("click", function (event) {
+                event.preventDefault();
+                const href = link.getAttribute("href");
+                if (!href) {
+                    return;
+                }
+                refreshSkills(href, true);
+            });
+        });
+    }
+
+    searchInput.addEventListener("input", function () {
+        const hasValue = searchInput.value.trim().length > 0;
+        clearButton.hidden = !hasValue;
+        scheduleFetch();
+    });
+
+    clearButton.addEventListener("click", function () {
+        searchInput.value = "";
+        clearButton.hidden = true;
+        fetchFilteredResults(true);
+    });
+
+    categorySelect.addEventListener("change", function () {
+        fetchFilteredResults(true);
+    });
+
+    statusSelect.addEventListener("change", function () {
+        fetchFilteredResults(true);
+    });
+
+    bindPaginationLinks();
+});
+</script>
+{% endblock %}

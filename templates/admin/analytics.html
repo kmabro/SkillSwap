@@ -1,0 +1,385 @@
+{% extends 'admin/base_admin.html' %}
+{% block admin_content %}
+<section class="panel analytics-header-panel">
+    <div class="analytics-header-copy">
+        <h1>Analytics Dashboard</h1>
+        <p>Monitor platform performance and user activity</p>
+    </div>
+    <form id="analyticsRangeForm" method="get" class="analytics-range-form">
+        <label>Time Range
+            <select name="range" id="analyticsRangeSelect">
+                {% for value, label in range_options %}
+                    <option value="{{ value }}" {% if selected_range == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </label>
+    </form>
+</section>
+
+<section class="panel">
+    <div class="metrics-grid">
+        {% for card in metric_cards %}
+            <article class="metric-card {{ card.key }}">
+                <div class="metric-value">{{ card.value }}</div>
+                <div class="metric-label">{{ card.label }}</div>
+            </article>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="analytics-two-col-grid">
+    <article class="panel chart-panel">
+        <h2>Requests Trend</h2>
+        <div class="chart-box md">
+            <canvas id="requestsTrendChart"></canvas>
+        </div>
+    </article>
+    <article class="panel chart-panel">
+        <h2>Exchange Activity</h2>
+        <div class="chart-box md">
+            <canvas id="exchangeActivityChart"></canvas>
+        </div>
+    </article>
+</section>
+
+<section class="analytics-two-col-grid">
+    <article class="panel chart-panel">
+        <h2>Reports Trend</h2>
+        <div class="chart-box md">
+            <canvas id="reportsTrendChart"></canvas>
+        </div>
+    </article>
+    <article class="panel chart-panel">
+        <h2>User Growth</h2>
+        <div class="chart-box md">
+            <canvas id="userGrowthChart"></canvas>
+        </div>
+    </article>
+</section>
+
+<section class="analytics-two-col-grid">
+    <article class="panel chart-panel">
+        <h2>Status Distribution</h2>
+        <div class="chart-box sm">
+            <canvas id="requestStatusPie"></canvas>
+        </div>
+    </article>
+    <article class="panel chart-panel">
+        <h2>Daily Request Activity</h2>
+        <div class="chart-box sm">
+            <canvas id="activityByDayChart"></canvas>
+        </div>
+    </article>
+</section>
+
+<section class="panel chart-panel">
+    <h2>Demand vs Supply</h2>
+    <div class="scroll-chart-wrap" id="skillsChartWrap">
+        <div class="skill-chart-inner" id="skillsChartInner">
+            <canvas id="demandSupplyChart"></canvas>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    :root {
+        --color-users: #2563eb;
+        --color-requests: #0d9488;
+        --color-reports: #dc2626;
+        --color-sessions: #7c3aed;
+        --color-completed: #16a34a;
+        --color-pending: #f59e0b;
+        --color-rejected: #dc2626;
+    }
+
+    .analytics-header-panel {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 1rem;
+        align-items: center;
+    }
+    .analytics-header-copy h1 {
+        margin: 0;
+        font-size: 1.45rem;
+        line-height: 1.2;
+    }
+    .analytics-header-copy p {
+        margin: 0.28rem 0 0;
+        color: #475569;
+        font-size: 0.9rem;
+    }
+    .analytics-range-form { display: flex; justify-content: flex-end; }
+    .analytics-range-form label { min-width: 220px; }
+
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+    .metric-card {
+        border: 1px solid #dbe9e6;
+        border-radius: 12px;
+        padding: 0.8rem;
+        min-height: 94px;
+        display: grid;
+        align-content: center;
+        gap: 0.35rem;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fbfd 100%);
+    }
+    .metric-card.total_users,
+    .metric-card.active_users { border-left: 4px solid var(--color-users); }
+    .metric-card.total_requests { border-left: 4px solid var(--color-requests); }
+    .metric-card.pending_requests { border-left: 4px solid var(--color-pending); }
+    .metric-card.completed_exchanges { border-left: 4px solid var(--color-completed); }
+    .metric-card.active_sessions { border-left: 4px solid var(--color-sessions); }
+    .metric-card.total_reports { border-left: 4px solid var(--color-reports); }
+    .metric-card.total_skills_listed { border-left: 4px solid var(--color-requests); }
+
+    .metric-value { font-size: 1.5rem; font-weight: 800; line-height: 1.1; }
+    .metric-label { font-size: 0.85rem; color: #334155; font-weight: 600; }
+
+    .analytics-two-col-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.9rem;
+        margin-bottom: 0.9rem;
+    }
+
+    .chart-panel { padding: 0.9rem; border-radius: 12px; }
+    .chart-box { position: relative; width: 100%; height: 300px; }
+    .chart-box.md { height: 300px; }
+    .chart-box.sm { height: 260px; }
+
+    .scroll-chart-wrap {
+        max-height: 430px;
+        overflow-y: auto;
+        border: 1px solid #dbe9e6;
+        border-radius: 12px;
+        padding: 0.55rem;
+    }
+    .skill-chart-inner { min-height: 280px; }
+
+    @media (max-width: 1180px) {
+        .metrics-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 900px) {
+        .analytics-header-panel { grid-template-columns: 1fr; }
+        .metrics-grid,
+        .analytics-two-col-grid { grid-template-columns: 1fr; }
+        .analytics-range-form { justify-content: stretch; }
+    }
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const rangeForm = document.getElementById("analyticsRangeForm");
+    const rangeSelect = document.getElementById("analyticsRangeSelect");
+
+    if (rangeForm && rangeSelect) {
+        rangeSelect.addEventListener("change", function () {
+            rangeForm.submit();
+        });
+    }
+
+    const COLORS = {
+        users: "rgb(37, 99, 235)",
+        requests: "rgb(13, 148, 136)",
+        reports: "rgb(220, 38, 38)",
+        sessions: "rgb(124, 58, 237)",
+        completed: "rgb(22, 163, 74)",
+        pending: "rgb(245, 158, 11)",
+        rejected: "rgb(220, 38, 38)"
+    };
+
+    const chartCommon = {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+            legend: { position: "bottom" },
+            tooltip: { backgroundColor: "rgba(15, 23, 42, 0.92)", padding: 10 }
+        },
+        scales: {
+            y: { beginAtZero: true }
+        }
+    };
+
+    new Chart(document.getElementById("requestsTrendChart"), {
+        type: "line",
+        data: {
+            labels: {{ requests_trend_labels|tojson }},
+            datasets: [
+                {
+                    label: "Requests",
+                    data: {{ requests_trend_values|tojson }},
+                    borderColor: COLORS.requests,
+                    backgroundColor: "rgba(13, 148, 136, 0.15)",
+                    fill: true,
+                    tension: 0.32,
+                    pointRadius: 2.5
+                }
+            ]
+        },
+        options: chartCommon
+    });
+
+    new Chart(document.getElementById("exchangeActivityChart"), {
+        type: "line",
+        data: {
+            labels: {{ requests_trend_labels|tojson }},
+            datasets: [
+                {
+                    label: "Accepted Requests",
+                    data: {{ exchange_created_values|tojson }},
+                    borderColor: COLORS.requests,
+                    backgroundColor: "rgba(13, 148, 136, 0.12)",
+                    fill: true,
+                    tension: 0.32
+                },
+                {
+                    label: "Completed Exchanges",
+                    data: {{ exchange_completed_values|tojson }},
+                    borderColor: COLORS.completed,
+                    backgroundColor: "rgba(22, 163, 74, 0.12)",
+                    fill: true,
+                    tension: 0.32
+                }
+            ]
+        },
+        options: chartCommon
+    });
+
+    new Chart(document.getElementById("reportsTrendChart"), {
+        type: "line",
+        data: {
+            labels: {{ reports_trend_labels|tojson }},
+            datasets: [
+                {
+                    label: "Reports",
+                    data: {{ reports_trend_values|tojson }},
+                    borderColor: COLORS.reports,
+                    backgroundColor: "rgba(220, 38, 38, 0.15)",
+                    fill: true,
+                    tension: 0.32,
+                    pointRadius: 2.5
+                }
+            ]
+        },
+        options: chartCommon
+    });
+
+    new Chart(document.getElementById("userGrowthChart"), {
+        type: "line",
+        data: {
+            labels: {{ user_growth_labels|tojson }},
+            datasets: [
+                {
+                    label: "Daily New Users",
+                    data: {{ user_growth_values|tojson }},
+                    borderColor: COLORS.users,
+                    backgroundColor: "rgba(37, 99, 235, 0.16)",
+                    fill: true,
+                    tension: 0.32,
+                    pointRadius: 2.4
+                },
+                {
+                    label: "Total Users",
+                    data: {{ user_growth_cumulative_values|tojson }},
+                    borderColor: "rgb(30, 64, 175)",
+                    backgroundColor: "rgba(30, 64, 175, 0.08)",
+                    fill: false,
+                    tension: 0.24,
+                    pointRadius: 2,
+                    hidden: false
+                }
+            ]
+        },
+        options: chartCommon
+    });
+
+    const skillLabels = {{ skill_compare_labels|tojson }};
+    const skillsChartInner = document.getElementById("skillsChartInner");
+    if (skillsChartInner) {
+        const minHeight = 280;
+        const rowHeight = 44;
+        skillsChartInner.style.height = Math.max(minHeight, skillLabels.length * rowHeight) + "px";
+    }
+
+    new Chart(document.getElementById("demandSupplyChart"), {
+        type: "bar",
+        data: {
+            labels: skillLabels,
+            datasets: [
+                {
+                    label: "Demand",
+                    data: {{ skill_demand_values|tojson }},
+                    backgroundColor: "rgba(13, 148, 136, 0.86)",
+                    borderRadius: 6
+                },
+                {
+                    label: "Supply",
+                    data: {{ skill_supply_values|tojson }},
+                    backgroundColor: "rgba(124, 58, 237, 0.72)",
+                    borderRadius: 6
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: "y",
+            plugins: { legend: { position: "bottom" } },
+            scales: {
+                x: { beginAtZero: true },
+                y: { ticks: { autoSkip: false } }
+            }
+        }
+    });
+
+    new Chart(document.getElementById("requestStatusPie"), {
+        type: "doughnut",
+        data: {
+            labels: {{ request_status_distribution_labels|tojson }},
+            datasets: [{
+                data: {{ request_status_distribution_values|tojson }},
+                backgroundColor: [COLORS.pending, COLORS.sessions, COLORS.completed, COLORS.rejected],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: "58%",
+            plugins: { legend: { position: "bottom" } }
+        }
+    });
+
+    new Chart(document.getElementById("activityByDayChart"), {
+        type: "bar",
+        data: {
+            labels: {{ activity_weekday_labels|tojson }},
+            datasets: [
+                {
+                    label: "Requests",
+                    data: {{ activity_weekday_values|tojson }},
+                    backgroundColor: "rgba(13, 148, 136, 0.74)",
+                    borderRadius: 6
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+});
+</script>
+{% endblock %}

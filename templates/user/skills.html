@@ -1,0 +1,187 @@
+{% extends 'user/base.html' %}
+{% block content %}
+<section class="panel">
+    <h2>Manage Skills</h2>
+    {% if skills_notice %}
+        <div id="skillsNotice" class="skills-inline-notice" role="status" aria-live="polite">{{ skills_notice }}</div>
+    {% endif %}
+    <form id="skill-form" method="post" class="form-grid inline-form skills-inline-form skills-form-card">
+        <label>Skill Name
+            <input type="text" name="skill_name" required>
+        </label>
+        <label class="category-field">Category
+            <div class="category-inline-row" id="categoryInlineRow">
+                <select name="category" id="categorySelect" required>
+                    <option value="">Select category</option>
+                    {% for cat in skill_categories %}
+                        <option value="{{ cat }}">{{ cat }}</option>
+                    {% endfor %}
+                </select>
+                <input type="text" name="custom_category" id="customCategoryInput" placeholder="Enter category" hidden>
+            </div>
+        </label>
+        <label>List Type
+            <select name="skill_type" id="skillTypeSelect" required>
+                <option value="offered">Offered</option>
+                <option value="wanted">Wanted</option>
+            </select>
+        </label>
+        <label><span id="skillLevelLabelText">Proficiency Level</span>
+            <select name="skill_level" required>
+                {% for lvl in skill_levels %}
+                    <option value="{{ lvl }}">{{ lvl }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <button class="btn" type="submit">Add Skill</button>
+    </form>
+
+    <div class="skills-sections">
+        <section class="skills-section-block">
+            <h3>Skills Offered</h3>
+            {% if offered_details %}
+                <div class="skills-card-list">
+                    {% for item in offered_details %}
+                        <article class="skill-detail-card skills-page-card">
+                            <div class="skills-page-card-main">
+                                <strong>
+                                    <svg class="skill-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                                        <path d="M12 3l7 9-7 9-7-9 7-9z"></path>
+                                        <path d="M9 12h6"></path>
+                                    </svg>
+                                    <span class="skills-name">{{ item.skill.skill_name|upper }}</span>
+                                </strong>
+                                <span>
+                                    <svg class="skill-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                                        <path d="M20.6 13.4L11.4 22.6a2 2 0 0 1-2.8 0L1.4 15.4a2 2 0 0 1 0-2.8l9.2-9.2a2 2 0 0 1 1.4-.6H20a2 2 0 0 1 2 2v8a2 2 0 0 1-.6 1.4z"></path>
+                                        <circle cx="16" cy="8" r="1.2"></circle>
+                                    </svg>
+                                    Category: {{ item.skill.category if item.skill.category else 'Uncategorized' }}
+                                </span>
+                                <span>
+                                    <svg class="skill-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                                        <path d="M3 20h18"></path>
+                                        <path d="M7 20v-4"></path>
+                                        <path d="M12 20v-8"></path>
+                                        <path d="M17 20v-12"></path>
+                                    </svg>
+                                    Level: {{ item.level }}
+                                </span>
+                            </div>
+                            <form method="post" action="{{ url_for('remove_skill', skill_type='offered', skill_id=item.skill.skill_id) }}" class="skills-remove-form">
+                                <button class="skill-remove-btn" type="submit" aria-label="Remove {{ item.skill.skill_name }} from offered skills" title="Remove Skill">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                                        <path d="M3 6h18"></path>
+                                        <path d="M8 6V4h8v2"></path>
+                                        <path d="M19 6l-1 14H6L5 6"></path>
+                                        <path d="M10 11v6"></path>
+                                        <path d="M14 11v6"></path>
+                                    </svg>
+                                </button>
+                            </form>
+                        </article>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="muted">No skills added yet</p>
+            {% endif %}
+        </section>
+
+        <section class="skills-section-block">
+            <h3>Skills Wanted</h3>
+            {% if wanted_details %}
+                <div class="skills-card-list">
+                    {% for item in wanted_details %}
+                        <article class="skill-detail-card skills-page-card">
+                            <div class="skills-page-card-main">
+                                <strong>
+                                    <svg class="skill-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                                        <path d="M12 3l7 9-7 9-7-9 7-9z"></path>
+                                        <path d="M9 12h6"></path>
+                                    </svg>
+                                    <span class="skills-name">{{ item.skill.skill_name|upper }}</span>
+                                </strong>
+                                <span>
+                                    <svg class="skill-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                                        <path d="M20.6 13.4L11.4 22.6a2 2 0 0 1-2.8 0L1.4 15.4a2 2 0 0 1 0-2.8l9.2-9.2a2 2 0 0 1 1.4-.6H20a2 2 0 0 1 2 2v8a2 2 0 0 1-.6 1.4z"></path>
+                                        <circle cx="16" cy="8" r="1.2"></circle>
+                                    </svg>
+                                    Category: {{ item.skill.category if item.skill.category else 'Uncategorized' }}
+                                </span>
+                                <span>
+                                    <svg class="skill-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                                        <path d="M3 20h18"></path>
+                                        <path d="M7 20v-4"></path>
+                                        <path d="M12 20v-8"></path>
+                                        <path d="M17 20v-12"></path>
+                                    </svg>
+                                    Level: {{ item.level }}
+                                </span>
+                            </div>
+                            <form method="post" action="{{ url_for('remove_skill', skill_type='wanted', skill_id=item.skill.skill_id) }}" class="skills-remove-form">
+                                <button class="skill-remove-btn" type="submit" aria-label="Remove {{ item.skill.skill_name }} from wanted skills" title="Remove Skill">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                                        <path d="M3 6h18"></path>
+                                        <path d="M8 6V4h8v2"></path>
+                                        <path d="M19 6l-1 14H6L5 6"></path>
+                                        <path d="M10 11v6"></path>
+                                        <path d="M14 11v6"></path>
+                                    </svg>
+                                </button>
+                            </form>
+                        </article>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="muted">No skills added yet</p>
+            {% endif %}
+        </section>
+    </div>
+</section>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const categorySelect = document.getElementById("categorySelect");
+    const categoryInlineRow = document.getElementById("categoryInlineRow");
+    const customInput = document.getElementById("customCategoryInput");
+    const skillTypeSelect = document.getElementById("skillTypeSelect");
+    const skillLevelLabelText = document.getElementById("skillLevelLabelText");
+    const skillsNotice = document.getElementById("skillsNotice");
+
+    function toggleCustomCategory() {
+        const isOther = categorySelect.value === "Other";
+        categoryInlineRow.classList.toggle("show-custom", isOther);
+        customInput.hidden = !isOther;
+        customInput.required = isOther;
+        if (!isOther) {
+            customInput.value = "";
+        }
+    }
+
+    function updateLevelLabel() {
+        if (skillTypeSelect.value === "wanted") {
+            skillLevelLabelText.textContent = "Desired Level";
+            return;
+        }
+        skillLevelLabelText.textContent = "Proficiency Level";
+    }
+
+    categorySelect.addEventListener("change", toggleCustomCategory);
+    skillTypeSelect.addEventListener("change", updateLevelLabel);
+    toggleCustomCategory();
+    updateLevelLabel();
+
+    if (skillsNotice) {
+        window.setTimeout(function () {
+            skillsNotice.classList.add("is-hidden");
+            window.setTimeout(function () {
+                if (skillsNotice && skillsNotice.parentNode) {
+                    skillsNotice.parentNode.removeChild(skillsNotice);
+                }
+            }, 380);
+        }, 4500);
+    }
+});
+</script>
+{% endblock %}
+

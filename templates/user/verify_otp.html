@@ -1,0 +1,17 @@
+{% extends 'user/base.html' %}
+{% block content %}
+<section class="panel small">
+    <h2>Verify OTP</h2>
+    <p class="muted">We sent a verification code to {{ pending_email }} so you can verify your email.</p>
+    <form method="post" class="form-grid verify-otp-form">
+        <label>OTP Code
+            <input type="text" name="otp" maxlength="6" pattern="[A-Za-z0-9]{6}" inputmode="text" placeholder="Enter 6-character OTP" required>
+        </label>
+        <button class="btn" type="submit">Verify OTP</button>
+    </form>
+    <form method="post" action="{{ url_for('resend_otp') }}" class="form-grid verify-otp-actions">
+        <button class="btn secondary" type="submit">Resend OTP</button>
+    </form>
+</section>
+{% endblock %}
+

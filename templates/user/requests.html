@@ -1,0 +1,383 @@
+{% extends 'user/base.html' %}
+{% block content %}
+{% macro render_request_status(status) -%}
+    {% set status_text = {
+        'pending': 'Pending',
+        'countered': 'Needs Response',
+        'accepted': 'Ongoing',
+        'awaiting_confirmation': 'Awaiting Confirmation',
+        'completed': 'Completed',
+        'terminated': 'Terminated',
+        'rejected': 'Rejected'
+    } %}
+    <span class="request-status-badge status-{{ status|replace('_', '-') }}">
+        {% if status in ['pending', 'awaiting_confirmation'] %}
+            <svg class="request-status-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                <circle cx="12" cy="12" r="9"></circle>
+                <path d="M12 7v5l3 2"></path>
+            </svg>
+        {% elif status == 'accepted' %}
+            <svg class="request-status-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                <path d="M21 12a9 9 0 0 1-15.5 6.36"></path>
+                <path d="M3 12a9 9 0 0 1 15.5-6.36"></path>
+                <path d="M3 16v2h2"></path>
+                <path d="M21 8V6h-2"></path>
+            </svg>
+        {% elif status == 'completed' %}
+            <svg class="request-status-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                <path d="M20 6L9 17l-5-5"></path>
+            </svg>
+        {% elif status == 'rejected' %}
+            <svg class="request-status-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                <path d="M18 6L6 18"></path>
+                <path d="M6 6l12 12"></path>
+            </svg>
+        {% elif status == 'terminated' %}
+            <svg class="request-status-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                <circle cx="12" cy="12" r="9"></circle>
+                <path d="M8.5 8.5l7 7"></path>
+                <path d="M15.5 8.5l-7 7"></path>
+            </svg>
+        {% elif status == 'countered' %}
+            <svg class="request-status-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                <path d="M3 12h13"></path>
+                <path d="M12 7l4 5-4 5"></path>
+                <path d="M21 12h-5"></path>
+            </svg>
+        {% endif %}
+        <span>{{ status_text.get(status, status|replace('_', ' ')|title) }}</span>
+    </span>
+{%- endmacro %}
+
+{% macro render_exchange_icon() -%}
+    <span class="exchange-swap-pill" aria-hidden="true">
+        <svg class="exchange-compact-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+            <path d="M4 7h11"></path>
+            <path d="M12 4l3 3-3 3"></path>
+            <path d="M20 17H9"></path>
+            <path d="M12 14l-3 3 3 3"></path>
+        </svg>
+    </span>
+{%- endmacro %}
+
+{% macro render_exchange_pair(left_skill, right_skill) -%}
+    <span class="exchange-compact">
+        <span class="exchange-skill">{{ left_skill }}</span>
+        {{ render_exchange_icon() }}
+        <span class="exchange-skill">{{ right_skill }}</span>
+    </span>
+{%- endmacro %}
+
+<section class="panel">
+    <h2>Incoming Requests ({{ incoming.count() }})</h2>
+    {% if incoming.count() %}
+        <div class="request-cards-grid" id="incomingCardsGrid">
+            {% for req in incoming %}
+                {% set display_left = req.final_offered_skill.skill_name if req.final_offered_skill else req.offered_skill.skill_name %}
+                {% set display_right = req.final_requested_skill.skill_name if req.final_requested_skill else req.requested_skill.skill_name %}
+                <article class="request-card status-accent-{{ req.status|replace('_', '-') }}">
+                    <div class="request-card-head">
+                        <div class="match-user-block" style="gap: 8px;">
+                            <div class="match-avatar" aria-hidden="true" style="width: 32px; height: 32px; flex: 0 0 32px;">
+                                <img
+                                    src="{{ url_for('static', filename=req.sender.profile_image_path) }}"
+                                    alt="@{{ req.sender.username }} avatar"
+                                    loading="lazy"
+                                    onerror="this.onerror=null;this.src='{{ url_for('static', filename='images/default-avatar.svg') }}';"
+                                >
+                            </div>
+                            <a class="request-user-link" href="{{ url_for('user_profile', username=req.sender.username) }}">@{{ req.sender.username }}</a>
+                        </div>
+                        {{ render_request_status(req.status) }}
+                    </div>
+                    <div class="request-card-exchange">{{ render_exchange_pair(display_left, display_right) }}</div>
+                    <div class="request-card-actions">
+                        {% if req.status == 'pending' %}
+                            <form method="post" action="{{ url_for('request_action', request_id=req.request_id) }}" class="request-action-form incoming-decision-form" data-original-skill-id="{{ req.offered_skill_id }}">
+                                <label>I prefer to receive
+                                    <select name="preferred_receive_skill_id" class="preferred-receive-select">
+                                        {% for skill in req.sender.offered_skills %}
+                                            <option value="{{ skill.skill_id }}" {% if skill.skill_id == req.offered_skill_id %}selected{% endif %}>{{ skill.skill_name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                                <div class="inline-actions">
+                                    <button class="btn tiny accept-btn" name="action" value="accept" type="submit">Accept</button>
+                                    <button class="btn tiny request-change-btn" name="action" value="request_change" type="submit" hidden>Request Change</button>
+                                    <button class="btn tiny danger" name="action" value="reject" type="submit">Reject</button>
+                                </div>
+                            </form>
+                        {% elif req.status == 'countered' %}
+                            <span class="level-badge">Counter-offer sent to sender</span>
+                        {% elif req.status == 'accepted' %}
+                            <div class="inline-actions">
+                                <form method="post" action="{{ url_for('request_action', request_id=req.request_id) }}" onsubmit="return confirm('Mark this exchange as complete? Other user must confirm.');">
+                                    <button class="btn tiny" name="action" value="complete" type="submit">Mark as Complete</button>
+                                </form>
+                                <a class="btn tiny tertiary request-chat-btn" href="{{ url_for('messages_thread', username=req.sender.username) }}">Chat</a>
+                                <form method="post" action="{{ url_for('start_session', request_id=req.request_id) }}" target="_blank" class="session-join-form" data-request-id="{{ req.request_id }}">
+                                    <button class="btn tiny secondary" type="submit">Join Session</button>
+                                </form>
+                            </div>
+                        {% elif req.status == 'awaiting_confirmation' %}
+                            <div class="inline-actions">
+                                {% if req.sender_confirmed and not req.receiver_confirmed %}
+                                    <form method="post" action="{{ url_for('request_action', request_id=req.request_id) }}">
+                                        <button class="btn tiny" name="action" value="confirm_completion" type="submit">Confirm Completion</button>
+                                    </form>
+                                    <form method="post" action="{{ url_for('request_action', request_id=req.request_id) }}">
+                                        <button class="btn tiny danger" name="action" value="reject_completion" type="submit">Reject Completion</button>
+                                    </form>
+                                {% else %}
+                                    <span class="level-badge">Waiting for other user confirmation</span>
+                                {% endif %}
+                                <form method="post" action="{{ url_for('start_session', request_id=req.request_id) }}" target="_blank" class="session-join-form" data-request-id="{{ req.request_id }}">
+                                    <button class="btn tiny secondary" type="submit">Join Session</button>
+                                </form>
+                            </div>
+                        {% elif req.status == 'completed' %}
+                            <div class="inline-actions">
+                                {% if my_ratings and my_ratings.get(req.request_id) %}
+                                    <button class="btn tiny secondary" type="button" disabled>Rated</button>
+                                {% else %}
+                                    <a class="btn tiny" href="{{ url_for('rate_user', request_id=req.request_id) }}">Rate</a>
+                                {% endif %}
+                                <a class="btn tiny tertiary request-chat-btn" href="{{ url_for('messages_thread', username=req.sender.username) }}">Chat</a>
+                            </div>
+                        {% elif req.status == 'terminated' %}
+                            <div class="inline-actions">
+                                <button class="btn tiny secondary" type="button" disabled>Session Ended</button>
+                                <a class="btn tiny tertiary request-chat-btn" href="{{ url_for('messages_thread', username=req.sender.username) }}">Chat</a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+        {% if incoming.count() > 6 %}
+            <div class="request-load-more-wrap">
+                <button class="btn tiny secondary request-load-more" type="button" data-target="incomingCardsGrid">Load More</button>
+            </div>
+        {% endif %}
+    {% else %}
+        <div class="request-empty-state" role="status" aria-live="polite">
+            <p>No requests yet</p>
+        </div>
+    {% endif %}
+</section>
+
+<section class="panel">
+    <h2>Outgoing Requests ({{ outgoing.count() }})</h2>
+    {% if outgoing.count() %}
+        <div class="request-cards-grid" id="outgoingCardsGrid">
+            {% for req in outgoing %}
+                {% set display_left = req.final_offered_skill.skill_name if req.final_offered_skill else req.offered_skill.skill_name %}
+                {% set display_right = req.final_requested_skill.skill_name if req.final_requested_skill else req.requested_skill.skill_name %}
+                <article class="request-card status-accent-{{ req.status|replace('_', '-') }}">
+                    <div class="request-card-head">
+                        <div class="match-user-block" style="gap: 8px;">
+                            <div class="match-avatar" aria-hidden="true" style="width: 32px; height: 32px; flex: 0 0 32px;">
+                                <img
+                                    src="{{ url_for('static', filename=req.receiver.profile_image_path) }}"
+                                    alt="@{{ req.receiver.username }} avatar"
+                                    loading="lazy"
+                                    onerror="this.onerror=null;this.src='{{ url_for('static', filename='images/default-avatar.svg') }}';"
+                                >
+                            </div>
+                            <a class="request-user-link" href="{{ url_for('user_profile', username=req.receiver.username) }}">@{{ req.receiver.username }}</a>
+                        </div>
+                        {{ render_request_status(req.status) }}
+                    </div>
+                    <div class="request-card-exchange">{{ render_exchange_pair(display_left, display_right) }}</div>
+                    <div class="request-card-actions">
+                        {% if req.status == 'countered' %}
+                            <div class="inline-actions">
+                                <form method="post" action="{{ url_for('request_action', request_id=req.request_id) }}">
+                                    <button class="btn tiny" name="action" value="accept_change" type="submit">Accept Change</button>
+                                </form>
+                                <form method="post" action="{{ url_for('request_action', request_id=req.request_id) }}">
+                                    <button class="btn tiny danger" name="action" value="reject_change" type="submit">Reject Change</button>
+                                </form>
+                            </div>
+                        {% elif req.status == 'accepted' %}
+                            <div class="inline-actions">
+                                <form method="post" action="{{ url_for('request_action', request_id=req.request_id) }}" onsubmit="return confirm('Mark this exchange as complete? Other user must confirm.');">
+                                    <button class="btn tiny" name="action" value="complete" type="submit">Mark as Complete</button>
+                                </form>
+                                <a class="btn tiny tertiary request-chat-btn" href="{{ url_for('messages_thread', username=req.receiver.username) }}">Chat</a>
+                                <form method="post" action="{{ url_for('start_session', request_id=req.request_id) }}" target="_blank" class="session-join-form" data-request-id="{{ req.request_id }}">
+                                    <button class="btn tiny secondary" type="submit">Join Session</button>
+                                </form>
+                            </div>
+                        {% elif req.status == 'awaiting_confirmation' %}
+                            <div class="inline-actions">
+                                {% if req.receiver_confirmed and not req.sender_confirmed %}
+                                    <form method="post" action="{{ url_for('request_action', request_id=req.request_id) }}">
+                                        <button class="btn tiny" name="action" value="confirm_completion" type="submit">Confirm Completion</button>
+                                    </form>
+                                    <form method="post" action="{{ url_for('request_action', request_id=req.request_id) }}">
+                                        <button class="btn tiny danger" name="action" value="reject_completion" type="submit">Reject Completion</button>
+                                    </form>
+                                {% else %}
+                                    <span class="level-badge">Waiting for other user confirmation</span>
+                                {% endif %}
+                                <form method="post" action="{{ url_for('start_session', request_id=req.request_id) }}" target="_blank" class="session-join-form" data-request-id="{{ req.request_id }}">
+                                    <button class="btn tiny secondary" type="submit">Join Session</button>
+                                </form>
+                            </div>
+                        {% elif req.status == 'completed' %}
+                            <div class="inline-actions">
+                                {% if my_ratings and my_ratings.get(req.request_id) %}
+                                    <button class="btn tiny secondary" type="button" disabled>Rated</button>
+                                {% else %}
+                                    <a class="btn tiny" href="{{ url_for('rate_user', request_id=req.request_id) }}">Rate</a>
+                                {% endif %}
+                                <a class="btn tiny tertiary request-chat-btn" href="{{ url_for('messages_thread', username=req.receiver.username) }}">Chat</a>
+                            </div>
+                        {% elif req.status == 'terminated' %}
+                            <div class="inline-actions">
+                                <button class="btn tiny secondary" type="button" disabled>Session Ended</button>
+                                <a class="btn tiny tertiary request-chat-btn" href="{{ url_for('messages_thread', username=req.receiver.username) }}">Chat</a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+        {% if outgoing.count() > 6 %}
+            <div class="request-load-more-wrap">
+                <button class="btn tiny secondary request-load-more" type="button" data-target="outgoingCardsGrid">Load More</button>
+            </div>
+        {% endif %}
+    {% else %}
+        <div class="request-empty-state" role="status" aria-live="polite">
+            <p>No requests yet</p>
+        </div>
+    {% endif %}
+</section>
+
+<section class="panel">
+    {% set completed_exchanges = active | selectattr('status', 'equalto', 'completed') | list %}
+    <h2>Completed Exchanges ({{ completed_exchanges|length }})</h2>
+    {% if completed_exchanges %}
+        <div class="request-cards-grid" id="completedCardsGrid">
+            {% for req in completed_exchanges %}
+                {% set final_offered = req.final_offered_skill.skill_name if req.final_offered_skill else req.offered_skill.skill_name %}
+                {% set final_requested = req.final_requested_skill.skill_name if req.final_requested_skill else req.requested_skill.skill_name %}
+                <article class="request-card status-accent-{{ req.status|replace('_', '-') }}">
+                    <div class="request-card-head">
+                        <span class="request-card-userpair">
+                            <a class="request-user-link" href="{{ url_for('user_profile', username=req.sender.username) }}">@{{ req.sender.username }}</a>
+                            <span class="user-connection-separator" aria-hidden="true">•</span>
+                            <a class="request-user-link" href="{{ url_for('user_profile', username=req.receiver.username) }}">@{{ req.receiver.username }}</a>
+                        </span>
+                        {{ render_request_status(req.status) }}
+                    </div>
+                    <div class="request-card-exchange">{{ render_exchange_pair(final_offered, final_requested) }}</div>
+                    <div class="request-card-actions">
+                        {% if my_ratings and my_ratings.get(req.request_id) %}
+                            <button class="btn tiny secondary" type="button" disabled>Rated</button>
+                        {% else %}
+                            <a class="btn tiny" href="{{ url_for('rate_user', request_id=req.request_id) }}">Rate</a>
+                        {% endif %}
+                        <a class="btn tiny tertiary request-chat-btn" href="{{ url_for('messages_thread', username=(req.receiver.username if req.sender.user_id == g.user.user_id else req.sender.username)) }}">Chat</a>
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+        {% if completed_exchanges|length > 6 %}
+            <div class="request-load-more-wrap">
+                <button class="btn tiny secondary request-load-more" type="button" data-target="completedCardsGrid">Load More</button>
+            </div>
+        {% endif %}
+    {% else %}
+        <div class="request-empty-state" role="status" aria-live="polite">
+            <p>No requests yet</p>
+        </div>
+    {% endif %}
+</section>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const decisionForms = document.querySelectorAll(".incoming-decision-form");
+    const loadMoreButtons = document.querySelectorAll(".request-load-more");
+
+    decisionForms.forEach(function (form) {
+        const originalSkillId = form.dataset.originalSkillId;
+        const select = form.querySelector(".preferred-receive-select");
+        const acceptBtn = form.querySelector(".accept-btn");
+        const requestChangeBtn = form.querySelector(".request-change-btn");
+
+        function syncDecisionButtons() {
+            const hasChange = select && select.value !== originalSkillId;
+            if (requestChangeBtn) {
+                requestChangeBtn.hidden = !hasChange;
+                requestChangeBtn.style.display = hasChange ? "inline-block" : "none";
+            }
+            if (acceptBtn) {
+                acceptBtn.disabled = hasChange;
+                acceptBtn.hidden = hasChange;
+                acceptBtn.style.display = hasChange ? "none" : "inline-block";
+            }
+        }
+
+        if (select) {
+            select.addEventListener("change", syncDecisionButtons);
+        }
+        syncDecisionButtons();
+    });
+
+    loadMoreButtons.forEach(function (button) {
+        const gridId = button.getAttribute("data-target");
+        const grid = gridId ? document.getElementById(gridId) : null;
+        if (!grid) {
+            return;
+        }
+
+        const allItems = Array.from(grid.querySelectorAll(".request-card"));
+        const pageSize = 6;
+        const totalItems = allItems.length;
+        let visibleCount = Math.min(pageSize, totalItems);
+
+        const remainingItems = allItems.slice(visibleCount);
+        remainingItems.forEach(function (card) {
+            card.remove();
+        });
+
+        console.log({
+            section: gridId,
+            total_items: totalItems,
+            currently_loaded: visibleCount
+        });
+
+        if (visibleCount >= totalItems) {
+            button.remove();
+            return;
+        }
+
+        button.hidden = false;
+
+        button.addEventListener("click", function () {
+            const nextItems = remainingItems.splice(0, pageSize);
+            nextItems.forEach(function (card) {
+                card.classList.add("request-card-enter");
+                grid.appendChild(card);
+            });
+            visibleCount += nextItems.length;
+
+            console.log({
+                section: gridId,
+                total_items: totalItems,
+                currently_loaded: visibleCount
+            });
+
+            if (visibleCount >= totalItems) {
+                button.remove();
+            }
+        });
+    });
+
+});
+</script>
+{% endblock %}
+

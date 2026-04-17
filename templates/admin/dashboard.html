@@ -1,0 +1,510 @@
+{% extends 'admin/base_admin.html' %}
+{% block admin_content %}
+<section class="panel">
+    <div class="stats metrics-grid">
+        <article>
+            <div class="stat-top">
+                <h3>{{ total_users }}</h3>
+                <span class="stat-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg>
+                </span>
+            </div>
+            <p>Total Users</p>
+        </article>
+        <article>
+            <div class="stat-top">
+                <h3>{{ active_users }}</h3>
+                <span class="stat-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="7" r="4"></circle><path d="M17 11l2 2 4-4"></path></svg>
+                </span>
+            </div>
+            <p>Active Users</p>
+        </article>
+        <article>
+            <div class="stat-top">
+                <h3>{{ pending_requests }}</h3>
+                <span class="stat-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+                </span>
+            </div>
+            <p>Pending Requests</p>
+        </article>
+        <article>
+            <div class="stat-top">
+                <h3>{{ ongoing_exchanges }}</h3>
+                <span class="stat-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3L4 7l4 4"></path><path d="M4 7h12a4 4 0 0 1 4 4"></path><path d="M16 21l4-4-4-4"></path><path d="M20 17H8a4 4 0 0 1-4-4"></path></svg>
+                </span>
+            </div>
+            <p>Ongoing Exchanges</p>
+        </article>
+        <article>
+            <div class="stat-top">
+                <h3>{{ completed_exchanges }}</h3>
+                <span class="stat-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 6L9 17l-5-5"></path></svg>
+                </span>
+            </div>
+            <p>Completed Exchanges</p>
+        </article>
+        <article>
+            <div class="stat-top">
+                <h3>{{ pending_reports }}</h3>
+                <span class="stat-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 9v4"></path><path d="M12 17h.01"></path><path d="M10.3 3.1 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.1a2 2 0 0 0-3.4 0z"></path></svg>
+                </span>
+            </div>
+            <p>Pending Reports</p>
+        </article>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="section-head-row">
+        <h2>Performance Overview</h2>
+        <form class="chart-range-form" method="get">
+            <label for="chartRangeSelect">Range</label>
+            <select id="chartRangeSelect" name="range">
+                <option value="1" {% if range_days == 1 %}selected{% endif %}>1 Day</option>
+                <option value="7" {% if range_days == 7 %}selected{% endif %}>7 Days</option>
+                <option value="14" {% if range_days == 14 %}selected{% endif %}>14 Days</option>
+                <option value="30" {% if range_days == 30 %}selected{% endif %}>1 Month</option>
+                <option value="90" {% if range_days == 90 %}selected{% endif %}>3 Months</option>
+                <option value="365" {% if range_days == 365 %}selected{% endif %}>1 Year</option>
+            </select>
+        </form>
+    </div>
+    <div class="charts-grid">
+        <article class="chart-card">
+            <h3 class="chart-title">Requests Over Time</h3>
+            <div class="chart-box">
+                <canvas id="requestsTrendChart" aria-label="Requests trend chart" role="img"></canvas>
+            </div>
+        </article>
+        <article class="chart-card">
+            <h3 class="chart-title">Reports Trend</h3>
+            <div class="chart-box">
+                <canvas id="reportsTrendChart" aria-label="Reports trend chart" role="img"></canvas>
+            </div>
+        </article>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="dashboard-activity-head">
+        <div>
+            <h2>Recent Activity</h2>
+            <p>Latest platform events and updates</p>
+        </div>
+    </div>
+    <div class="table-wrap logs-table-wrap dashboard-logs-wrap">
+        <table class="logs-table dashboard-logs-table" aria-label="Recent activity">
+            <thead>
+                <tr>
+                    <th>
+                        <span class="header-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="9"></circle>
+                                <path d="M12 7v5l3 2"></path>
+                            </svg>
+                        </span>
+                        Time
+                    </th>
+                    <th>Event</th>
+                    <th>Actor</th>
+                    <th>Details</th>
+                    <th class="col-severity">Severity</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in recent_activity_rows %}
+                    <tr>
+                        <td>{{ row.time }}</td>
+                        <td>
+                            <span class="event-cell">
+                                <span class="event-icon" aria-hidden="true">
+                                    {% if row.event_key == 'user_registration' %}
+                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                                    {% elif row.event_key == 'request_update' %}
+                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.13-3.36L23 10M1 14l5.36 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                                    {% elif row.event_key == 'user_report' %}
+                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                                    {% elif row.event_key == 'feedback' %}
+                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                                    {% else %}
+                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle></svg>
+                                    {% endif %}
+                                </span>
+                                {{ row.event }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if row.event_key == 'request_update' and row.actor_from and row.actor_to %}
+                                <span class="actor-with-arrow">
+                                    <span>{{ row.actor_from }}</span>
+                                    <span class="arrow-icon" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                                    </span>
+                                    <span>{{ row.actor_to }}</span>
+                                </span>
+                            {% else %}
+                                {{ row.actor }}
+                            {% endif %}
+                        </td>
+                        <td class="details-cell">{{ row.details }}</td>
+                        <td class="severity-cell">
+                            <span class="severity-badge severity-{{ row.severity|lower }}">{{ row.severity|title }}</span>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="5" class="dashboard-empty-row">No recent activity available.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="dashboard-activity-actions">
+        <a class="dashboard-activity-btn" href="{{ url_for('admin_activity_logs_page') }}">
+            <span>View All Activity Logs</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+        </a>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    .section-head-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 0.7rem;
+        align-items: center;
+        margin-bottom: 0.75rem;
+    }
+
+    .section-head-row h2 {
+        margin: 0;
+    }
+
+    .chart-range-form {
+        display: grid;
+        gap: 0.25rem;
+        min-width: 170px;
+    }
+
+    .chart-range-form label {
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: var(--muted);
+    }
+
+    .stats.metrics-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.95rem;
+    }
+
+    .stats.metrics-grid > article {
+        width: 100%;
+    }
+
+    .dashboard-activity-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 0.75rem;
+        margin-bottom: 0.72rem;
+    }
+
+    .dashboard-activity-head h2 {
+        margin: 0;
+    }
+
+    .dashboard-activity-head p {
+        margin: 0.22rem 0 0;
+        font-size: 0.9rem;
+        color: #64748b;
+    }
+
+    .dashboard-logs-wrap {
+        overflow: auto;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+    }
+
+    .dashboard-logs-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        table-layout: auto;
+    }
+
+    .dashboard-logs-table thead th {
+        text-align: left;
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: #475569;
+        background: #f8fafc;
+        padding: 0.72rem 0.82rem;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .dashboard-logs-table tbody td {
+        padding: 0.92rem 0.82rem;
+        border-bottom: 1px solid #eef2f7;
+        vertical-align: top;
+        color: #0f172a;
+        font-size: 0.9rem;
+        line-height: 1.45;
+    }
+
+    .dashboard-logs-table tbody tr:hover {
+        background: #f8fbff;
+    }
+
+    .dashboard-logs-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    .header-icon {
+        margin-right: 0.35rem;
+        vertical-align: -2px;
+        color: #64748b;
+    }
+
+    .event-cell {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        font-weight: 600;
+    }
+
+    .event-icon {
+        width: 1rem;
+        height: 1rem;
+        color: #475569;
+        flex: 0 0 auto;
+    }
+
+    .actor-with-arrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        flex-wrap: wrap;
+    }
+
+    .arrow-icon {
+        width: 0.9rem;
+        height: 0.9rem;
+        color: #64748b;
+        flex: 0 0 auto;
+    }
+
+    .details-cell {
+        color: #334155;
+        word-break: break-word;
+    }
+
+    .col-severity,
+    .severity-cell {
+        text-align: left;
+        white-space: nowrap;
+        width: 1%;
+    }
+
+    .severity-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: flex-start;
+        min-width: 74px;
+        height: 26px;
+        padding: 0 0.56rem;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: capitalize;
+        width: fit-content;
+    }
+
+    .severity-info {
+        color: #1d4ed8;
+        background: #dbeafe;
+    }
+
+    .severity-success {
+        color: #166534;
+        background: #dcfce7;
+    }
+
+    .severity-warning {
+        color: #9a3412;
+        background: #ffedd5;
+    }
+
+    .severity-error {
+        color: #991b1b;
+        background: #fee2e2;
+    }
+
+    .dashboard-empty-row {
+        text-align: center;
+        color: #64748b;
+    }
+
+    .dashboard-activity-actions {
+        margin-top: 0.82rem;
+    }
+
+    .dashboard-activity-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.54rem 0.88rem;
+        border-radius: 10px;
+        background: var(--accent-purple);
+        color: #ffffff !important;
+        font-size: 0.9rem;
+        font-weight: 700;
+        text-decoration: none;
+        transition: background-color 0.2s ease, transform 0.16s ease, box-shadow 0.2s ease;
+    }
+
+    .dashboard-activity-btn svg {
+        width: 15px;
+        height: 15px;
+    }
+
+    .dashboard-activity-btn:hover {
+        background: #6d28d9;
+        transform: translateY(-1px);
+        box-shadow: 0 8px 18px rgba(124, 58, 237, 0.25);
+        text-decoration: none;
+    }
+
+    .dashboard-activity-btn:active {
+        transform: translateY(0);
+    }
+
+    .dashboard-activity-btn:focus-visible {
+        outline: 2px solid rgba(124, 58, 237, 0.45);
+        outline-offset: 2px;
+    }
+
+    @media (max-width: 980px) {
+        .stats.metrics-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 680px) {
+        .section-head-row {
+            grid-template-columns: 1fr;
+        }
+
+        .chart-range-form {
+            min-width: 0;
+        }
+
+        .stats.metrics-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .dashboard-logs-table {
+            min-width: 860px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const chartRangeSelect = document.getElementById("chartRangeSelect");
+    const chartRangeForm = chartRangeSelect ? chartRangeSelect.form : null;
+
+    if (chartRangeSelect && chartRangeForm) {
+        const storageKey = "adminDashboardRange";
+        const params = new URLSearchParams(window.location.search);
+        const hasQueryRange = params.has("range");
+        const savedRange = localStorage.getItem(storageKey);
+        const allowedRanges = new Set(["1", "7", "14", "30", "90", "365"]);
+
+        if (!hasQueryRange && savedRange && allowedRanges.has(savedRange) && chartRangeSelect.value !== savedRange) {
+            chartRangeSelect.value = savedRange;
+            chartRangeForm.submit();
+            return;
+        }
+
+        localStorage.setItem(storageKey, chartRangeSelect.value);
+
+        chartRangeSelect.addEventListener("change", function () {
+            localStorage.setItem(storageKey, chartRangeSelect.value);
+            chartRangeForm.submit();
+        });
+    }
+
+    const trendCanvas = document.getElementById("requestsTrendChart");
+    const reportsCanvas = document.getElementById("reportsTrendChart");
+    const requestsTrendLabels = JSON.parse('{{ requests_trend_labels|tojson|safe }}');
+    const requestsTrendValues = JSON.parse('{{ requests_trend_values|tojson|safe }}');
+    const reportsTrendLabels = JSON.parse('{{ reports_trend_labels|tojson|safe }}');
+    const reportsTrendValues = JSON.parse('{{ reports_trend_values|tojson|safe }}');
+
+    if (trendCanvas) {
+        new Chart(trendCanvas, {
+            type: "line",
+            data: {
+                labels: requestsTrendLabels,
+                datasets: [{
+                    label: "Requests",
+                    data: requestsTrendValues,
+                    borderColor: "#0f766e",
+                    backgroundColor: "rgba(15, 118, 110, 0.14)",
+                    fill: true,
+                    tension: 0.34,
+                    pointRadius: 3,
+                    pointHoverRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { color: "#ebf0ef" } },
+                    y: { beginAtZero: true, grid: { color: "#ebf0ef" }, ticks: { precision: 0 } }
+                }
+            }
+        });
+    }
+
+    if (reportsCanvas) {
+        new Chart(reportsCanvas, {
+            type: "line",
+            data: {
+                labels: reportsTrendLabels,
+                datasets: [{
+                    label: "Reports",
+                    data: reportsTrendValues,
+                    borderColor: "#dc2626",
+                    backgroundColor: "rgba(220, 38, 38, 0.12)",
+                    fill: true,
+                    tension: 0.32,
+                    pointRadius: 2.5
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { color: "#ebf0ef" } },
+                    y: { beginAtZero: true, grid: { color: "#ebf0ef" }, ticks: { precision: 0 } }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

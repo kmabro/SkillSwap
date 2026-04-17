@@ -1,0 +1,1217 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SkillSwap ER Diagram Visualizer</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --border: #dbe3ef;
+      --accent: #2563eb;
+      --accent-soft: #dbeafe;
+      --pk: #0f766e;
+      --fk: #7c3aed;
+      --line: #64748b;
+      --line-active: #2563eb;
+      --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+    }
+
+    [data-theme="dark"] {
+      --bg: #0b1220;
+      --panel: #111a2d;
+      --text: #e5edf8;
+      --muted: #9db0cc;
+      --border: #24324a;
+      --accent: #60a5fa;
+      --accent-soft: #1e3a5f;
+      --pk: #34d399;
+      --fk: #a78bfa;
+      --line: #7d8ea8;
+      --line-active: #60a5fa;
+      --shadow: 0 14px 36px rgba(2, 6, 23, 0.55);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Inter", Arial, sans-serif;
+      color: var(--text);
+      background: radial-gradient(circle at 10% -20%, #dbeafe 0%, transparent 30%), var(--bg);
+      min-height: 100vh;
+    }
+
+    [data-theme="dark"] body,
+    body[data-theme="dark"] {
+      background: radial-gradient(circle at 10% -20%, #1d3354 0%, transparent 28%), var(--bg);
+    }
+
+    .shell {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      min-height: 100vh;
+      gap: 0;
+    }
+
+    .sidebar {
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      padding: 16px;
+      overflow: auto;
+      box-shadow: var(--shadow);
+      z-index: 2;
+    }
+
+    .main {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+      position: sticky;
+      top: 0;
+      z-index: 3;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: 18px;
+      letter-spacing: 0.2px;
+    }
+
+    .subtle {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .field {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .field label {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .input, .btn {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 9px 10px;
+      font-size: 13px;
+    }
+
+    .btn {
+      cursor: pointer;
+      transition: transform .15s ease, background .2s ease, border-color .2s ease;
+    }
+
+    .btn:hover {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .btn:active {
+      transform: translateY(1px);
+    }
+
+    .btn.small {
+      padding: 7px 10px;
+      font-size: 12px;
+    }
+
+    .btn.primary {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .stack {
+      display: grid;
+      gap: 8px;
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .table-list {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      max-height: 50vh;
+      overflow: auto;
+      padding: 8px;
+      background: color-mix(in srgb, var(--panel) 92%, transparent);
+    }
+
+    .table-item {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      padding: 5px 2px;
+      font-size: 13px;
+    }
+
+    .legend {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      display: inline-block;
+      margin-right: 6px;
+    }
+
+    .canvas-wrap {
+      position: relative;
+      flex: 1;
+      overflow: hidden;
+      background:
+        linear-gradient(to right, rgba(148, 163, 184, .08) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(148, 163, 184, .08) 1px, transparent 1px),
+        var(--bg);
+      background-size: 28px 28px, 28px 28px, auto;
+      cursor: grab;
+    }
+
+    .canvas-wrap.dragging {
+      cursor: grabbing;
+    }
+
+    #erSvg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    #viewport {
+      transition: transform .2s ease;
+    }
+
+    .entity {
+      filter: drop-shadow(0 8px 14px rgba(15, 23, 42, .10));
+      cursor: pointer;
+      transition: opacity .2s ease;
+    }
+
+    .entity.hidden,
+    .relation.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .entity.dim,
+    .relation.dim {
+      opacity: .2;
+    }
+
+    .entity-box {
+      fill: var(--panel);
+      stroke: var(--border);
+      stroke-width: 1.2;
+      rx: 14;
+      ry: 14;
+    }
+
+    .entity-head {
+      fill: color-mix(in srgb, var(--accent) 16%, var(--panel));
+      stroke: var(--border);
+      stroke-width: 1;
+      rx: 14;
+      ry: 14;
+    }
+
+    .entity-title {
+      fill: var(--text);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.25px;
+    }
+
+    .col-text {
+      fill: var(--text);
+      font-size: 11.5px;
+    }
+
+    .col-type {
+      fill: var(--muted);
+      font-size: 10px;
+    }
+
+    .badge {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: .5px;
+    }
+
+    .relation {
+      fill: none;
+      stroke: var(--line);
+      stroke-width: 1.5;
+      opacity: .9;
+      transition: opacity .2s ease, stroke .2s ease, stroke-width .2s ease;
+    }
+
+    .relation.active {
+      stroke: var(--line-active);
+      stroke-width: 2.1;
+      opacity: 1;
+    }
+
+    .relation-label {
+      fill: var(--muted);
+      font-size: 10px;
+    }
+
+    .status {
+      margin-left: auto;
+      color: var(--muted);
+      font-size: 12px;
+      max-width: 420px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 1000px) {
+      .shell {
+        grid-template-columns: 1fr;
+      }
+      .sidebar {
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+        max-height: 42vh;
+      }
+      .status {
+        width: 100%;
+        margin-left: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell" id="appRoot" data-theme="light">
+    <aside class="sidebar">
+      <h1>ER Diagram Visualizer</h1>
+      <p class="subtle">Dynamic viewer generated from SQL schema. It auto-loads <strong>../schema.sql</strong> when available, with inline fallback so it works immediately.</p>
+
+      <div class="field">
+        <label for="searchInput">Search tables</label>
+        <input id="searchInput" class="input" type="text" placeholder="e.g. users, requests" />
+      </div>
+
+      <div class="row">
+        <button id="showAllBtn" class="btn small">Show All</button>
+        <button id="hideAllBtn" class="btn small">Hide All</button>
+        <button id="resetFocusBtn" class="btn small">Reset Focus</button>
+      </div>
+
+      <div class="row" style="margin-top:8px;">
+        <button id="toggleRelationsBtn" class="btn small">Hide Relations</button>
+        <button id="themeBtn" class="btn small">Dark Mode</button>
+        <button id="collapseBtn" class="btn small">Collapse All</button>
+      </div>
+
+      <div class="row" style="margin-top:8px;">
+        <button id="loadFileBtn" class="btn small">Load schema.sql</button>
+        <input id="schemaFileInput" type="file" accept=".sql,text/plain" style="display:none" />
+      </div>
+
+      <div class="row" style="margin-top:8px;">
+        <button id="exportSvgBtn" class="btn small">Export SVG</button>
+        <button id="exportPngBtn" class="btn small">Export PNG</button>
+      </div>
+
+      <div class="legend">
+        <div><span class="dot" style="background: var(--pk);"></span>Primary Key</div>
+        <div><span class="dot" style="background: var(--fk);"></span>Foreign Key</div>
+      </div>
+
+      <hr style="border:0; border-top:1px solid var(--border); margin:12px 0;">
+      <div id="tableList" class="table-list"></div>
+    </aside>
+
+    <section class="main">
+      <div class="toolbar">
+        <button id="zoomOutBtn" class="btn small">-</button>
+        <button id="zoomResetBtn" class="btn small">100%</button>
+        <button id="zoomInBtn" class="btn small">+</button>
+        <span class="status" id="statusText">Loading schema...</span>
+      </div>
+
+      <div id="canvasWrap" class="canvas-wrap">
+        <svg id="erSvg" xmlns="http://www.w3.org/2000/svg" aria-label="ER diagram canvas">
+          <defs>
+            <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L10,5 L0,10 z" fill="currentColor"></path>
+            </marker>
+          </defs>
+          <g id="viewport"></g>
+        </svg>
+      </div>
+    </section>
+  </div>
+
+  <!-- Fallback source for file:// mode; auto-refreshed by editing schema.sql and reopening this file if fetch is blocked. -->
+  <script id="schemaFallback" type="text/plain">
+-- MySQL schema aligned with the current SkillSwap Flask models.
+CREATE DATABASE IF NOT EXISTS skillswap CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE skillswap;
+
+SET FOREIGN_KEY_CHECKS = 0;
+
+DROP TABLE IF EXISTS notifications;
+DROP TABLE IF EXISTS messages;
+DROP TABLE IF EXISTS user_reports;
+DROP TABLE IF EXISTS ratings;
+DROP TABLE IF EXISTS requests;
+DROP TABLE IF EXISTS user_skills;
+DROP TABLE IF EXISTS user_skills_wanted;
+DROP TABLE IF EXISTS user_skills_offered;
+DROP TABLE IF EXISTS skills;
+DROP TABLE IF EXISTS categories;
+DROP TABLE IF EXISTS users;
+
+SET FOREIGN_KEY_CHECKS = 1;
+
+CREATE TABLE users (
+    user_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    username VARCHAR(40) NOT NULL,
+    email VARCHAR(120) NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    role VARCHAR(20) NOT NULL DEFAULT 'user',
+    is_blocked BOOLEAN NOT NULL DEFAULT FALSE,
+    availability BOOLEAN NOT NULL DEFAULT TRUE,
+    availability_status VARCHAR(20) NOT NULL DEFAULT 'Available',
+    profile_image VARCHAR(255) NULL,
+    bio TEXT NULL,
+    location VARCHAR(120) NULL,
+    show_email_on_profile BOOLEAN NOT NULL DEFAULT FALSE,
+    is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    otp_code TEXT NULL,
+    otp_expiry DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_seen_at DATETIME NULL,
+    UNIQUE KEY uq_users_username (username),
+    UNIQUE KEY uq_users_email (email),
+    KEY ix_users_username (username)
+);
+
+CREATE TABLE categories (
+    category_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(80) NOT NULL,
+    UNIQUE KEY uq_categories_name (name),
+    KEY ix_categories_name (name)
+);
+
+CREATE TABLE skills (
+    skill_id INT AUTO_INCREMENT PRIMARY KEY,
+    skill_name VARCHAR(120) NOT NULL,
+    category_id INT NULL,
+    category VARCHAR(80) NULL,
+    description VARCHAR(255) NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
+    UNIQUE KEY uq_skills_name (skill_name),
+    KEY ix_skills_name (skill_name),
+    KEY ix_skills_category_id (category_id),
+    CONSTRAINT fk_skills_category FOREIGN KEY (category_id) REFERENCES categories(category_id)
+);
+
+CREATE TABLE user_skills_offered (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    skill_id INT NOT NULL,
+    level VARCHAR(20) NOT NULL DEFAULT 'Intermediate',
+    UNIQUE KEY uq_offered (user_id, skill_id),
+    CONSTRAINT fk_offered_user FOREIGN KEY (user_id) REFERENCES users(user_id),
+    CONSTRAINT fk_offered_skill FOREIGN KEY (skill_id) REFERENCES skills(skill_id)
+);
+
+CREATE TABLE user_skills_wanted (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    skill_id INT NOT NULL,
+    level VARCHAR(20) NOT NULL DEFAULT 'Beginner',
+    UNIQUE KEY uq_wanted (user_id, skill_id),
+    CONSTRAINT fk_wanted_user FOREIGN KEY (user_id) REFERENCES users(user_id),
+    CONSTRAINT fk_wanted_skill FOREIGN KEY (skill_id) REFERENCES skills(skill_id)
+);
+
+CREATE TABLE user_skills (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    skill_id INT NOT NULL,
+    UNIQUE KEY uq_user_skills_user_skill (user_id, skill_id),
+    KEY ix_user_skills_user_id (user_id),
+    KEY ix_user_skills_skill_id (skill_id),
+    CONSTRAINT fk_user_skills_user FOREIGN KEY (user_id) REFERENCES users(user_id),
+    CONSTRAINT fk_user_skills_skill FOREIGN KEY (skill_id) REFERENCES skills(skill_id)
+);
+
+CREATE TABLE requests (
+    request_id INT AUTO_INCREMENT PRIMARY KEY,
+    sender_id INT NOT NULL,
+    receiver_id INT NOT NULL,
+    offered_skill_id INT NOT NULL,
+    requested_skill_id INT NOT NULL,
+    final_offered_skill_id INT NULL,
+    final_requested_skill_id INT NULL,
+    status VARCHAR(40) NOT NULL DEFAULT 'pending',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    sender_rated BOOLEAN NOT NULL DEFAULT FALSE,
+    receiver_rated BOOLEAN NOT NULL DEFAULT FALSE,
+    is_completed_by_sender BOOLEAN NOT NULL DEFAULT FALSE,
+    is_completed_by_receiver BOOLEAN NOT NULL DEFAULT FALSE,
+    sender_confirmed BOOLEAN NOT NULL DEFAULT FALSE,
+    receiver_confirmed BOOLEAN NOT NULL DEFAULT FALSE,
+    rated_by_sender BOOLEAN NOT NULL DEFAULT FALSE,
+    rated_by_receiver BOOLEAN NOT NULL DEFAULT FALSE,
+    session_room VARCHAR(120) NULL,
+    session_link VARCHAR(255) NULL,
+    session_scheduled_for DATETIME NULL,
+    session_proposed_by INT NULL,
+    session_confirmed_at DATETIME NULL,
+    session_started_at DATETIME NULL,
+    session_completed_at DATETIME NULL,
+    CONSTRAINT ck_request_status CHECK (status IN ('pending', 'countered', 'accepted', 'rejected', 'awaiting_confirmation', 'completed')),
+    KEY ix_requests_status (status),
+    CONSTRAINT fk_req_sender FOREIGN KEY (sender_id) REFERENCES users(user_id),
+    CONSTRAINT fk_req_receiver FOREIGN KEY (receiver_id) REFERENCES users(user_id),
+    CONSTRAINT fk_req_offered_skill FOREIGN KEY (offered_skill_id) REFERENCES skills(skill_id),
+    CONSTRAINT fk_req_requested_skill FOREIGN KEY (requested_skill_id) REFERENCES skills(skill_id),
+    CONSTRAINT fk_req_final_offered_skill FOREIGN KEY (final_offered_skill_id) REFERENCES skills(skill_id),
+    CONSTRAINT fk_req_final_requested_skill FOREIGN KEY (final_requested_skill_id) REFERENCES skills(skill_id),
+    CONSTRAINT fk_req_session_proposed_by FOREIGN KEY (session_proposed_by) REFERENCES users(user_id)
+);
+
+CREATE TABLE ratings (
+    rating_id INT AUTO_INCREMENT PRIMARY KEY,
+    from_user INT NOT NULL,
+    to_user INT NOT NULL,
+    exchange_request_id INT NULL,
+    rating INT NOT NULL,
+    feedback TEXT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT ck_rating_value CHECK (rating >= 1 AND rating <= 5),
+    UNIQUE KEY uq_rating_exchange_from_user (exchange_request_id, from_user),
+    KEY ix_ratings_exchange_request_id (exchange_request_id),
+    CONSTRAINT fk_rating_from FOREIGN KEY (from_user) REFERENCES users(user_id),
+    CONSTRAINT fk_rating_to FOREIGN KEY (to_user) REFERENCES users(user_id),
+    CONSTRAINT fk_rating_exchange_request FOREIGN KEY (exchange_request_id) REFERENCES requests(request_id)
+);
+
+CREATE TABLE user_reports (
+    report_id INT AUTO_INCREMENT PRIMARY KEY,
+    reporter_id INT NOT NULL,
+    reported_user_id INT NOT NULL,
+    reason VARCHAR(40) NOT NULL,
+    description TEXT NULL,
+    report_attachments TEXT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY ix_user_reports_status (status),
+    CONSTRAINT fk_report_reporter FOREIGN KEY (reporter_id) REFERENCES users(user_id),
+    CONSTRAINT fk_report_reported_user FOREIGN KEY (reported_user_id) REFERENCES users(user_id)
+);
+
+CREATE TABLE messages (
+    message_id INT AUTO_INCREMENT PRIMARY KEY,
+    sender_id INT NOT NULL,
+    receiver_id INT NOT NULL,
+    message TEXT NOT NULL,
+    message_type VARCHAR(20) NOT NULL DEFAULT 'user',
+    attachment_url TEXT NULL,
+    attachment_type TEXT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    read_at DATETIME NULL,
+    CONSTRAINT fk_message_sender FOREIGN KEY (sender_id) REFERENCES users(user_id),
+    CONSTRAINT fk_message_receiver FOREIGN KEY (receiver_id) REFERENCES users(user_id)
+);
+
+CREATE TABLE notifications (
+    notification_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    message VARCHAR(255) NOT NULL,
+    notif_type VARCHAR(40) NOT NULL,
+    link VARCHAR(255) NULL,
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_notification_user FOREIGN KEY (user_id) REFERENCES users(user_id)
+);
+  </script>
+
+  <script>
+    (function () {
+      "use strict";
+
+      const ui = {
+        root: document.getElementById("appRoot"),
+        status: document.getElementById("statusText"),
+        search: document.getElementById("searchInput"),
+        tableList: document.getElementById("tableList"),
+        viewport: document.getElementById("viewport"),
+        svg: document.getElementById("erSvg"),
+        canvasWrap: document.getElementById("canvasWrap"),
+        showAllBtn: document.getElementById("showAllBtn"),
+        hideAllBtn: document.getElementById("hideAllBtn"),
+        resetFocusBtn: document.getElementById("resetFocusBtn"),
+        toggleRelationsBtn: document.getElementById("toggleRelationsBtn"),
+        themeBtn: document.getElementById("themeBtn"),
+        collapseBtn: document.getElementById("collapseBtn"),
+        loadFileBtn: document.getElementById("loadFileBtn"),
+        schemaFileInput: document.getElementById("schemaFileInput"),
+        exportSvgBtn: document.getElementById("exportSvgBtn"),
+        exportPngBtn: document.getElementById("exportPngBtn"),
+        zoomInBtn: document.getElementById("zoomInBtn"),
+        zoomOutBtn: document.getElementById("zoomOutBtn"),
+        zoomResetBtn: document.getElementById("zoomResetBtn")
+      };
+
+      const state = {
+        schema: null,
+        hiddenTables: new Set(),
+        hideRelations: false,
+        isolatedTable: null,
+        collapsedTables: new Set(),
+        transform: { x: 40, y: 28, k: 1 },
+        drag: { active: false, x: 0, y: 0, tx: 0, ty: 0 },
+        theme: "light"
+      };
+
+      const layoutCfg = {
+        cardWidth: 300,
+        rowHeight: 22,
+        headHeight: 36,
+        colGap: 60,
+        rowGap: 56,
+        minRowsWhenCollapsed: 1
+      };
+
+      function setStatus(msg) {
+        ui.status.textContent = msg;
+      }
+
+      function sanitizeSql(sql) {
+        return String(sql || "")
+          .replace(/\/\*[\s\S]*?\*\//g, "")
+          .replace(/--.*$/gm, "")
+          .trim();
+      }
+
+      function splitDefs(body) {
+        const parts = [];
+        let current = "";
+        let depth = 0;
+        for (let i = 0; i < body.length; i += 1) {
+          const ch = body[i];
+          if (ch === "(") depth += 1;
+          if (ch === ")") depth -= 1;
+          if (ch === "," && depth === 0) {
+            parts.push(current.trim());
+            current = "";
+            continue;
+          }
+          current += ch;
+        }
+        if (current.trim()) parts.push(current.trim());
+        return parts;
+      }
+
+      function parseSchemaFromSQL(rawSql) {
+        const sql = sanitizeSql(rawSql);
+        const tables = [];
+        const rels = [];
+        const tableRegex = /CREATE\s+TABLE\s+([`\"]?)([a-zA-Z0-9_]+)\1\s*\(([^;]+?)\)\s*;/gis;
+
+        let m;
+        while ((m = tableRegex.exec(sql)) !== null) {
+          const tableName = m[2].toLowerCase();
+          const body = m[3];
+          const defs = splitDefs(body);
+          const columns = [];
+          const pkSet = new Set();
+          const fkByCol = new Map();
+
+          defs.forEach((line) => {
+            const colMatch = line.match(/^([`\"]?)([a-zA-Z0-9_]+)\1\s+(.+)$/i);
+            const upper = line.toUpperCase();
+
+            if (/^(CONSTRAINT|PRIMARY\s+KEY|UNIQUE\s+KEY|KEY|INDEX|FOREIGN\s+KEY)/i.test(line)) {
+              const pkMatch = line.match(/PRIMARY\s+KEY\s*\(([^\)]+)\)/i);
+              if (pkMatch) {
+                pkMatch[1].split(",").forEach((c) => pkSet.add(c.replace(/["`\s]/g, "").toLowerCase()));
+              }
+
+              const fkMatch = line.match(/FOREIGN\s+KEY\s*\(([^\)]+)\)\s+REFERENCES\s+([`\"]?)([a-zA-Z0-9_]+)\2\s*\(([^\)]+)\)/i);
+              if (fkMatch) {
+                const fromCol = fkMatch[1].replace(/["`\s]/g, "").toLowerCase();
+                const toTable = fkMatch[3].toLowerCase();
+                const toCol = fkMatch[4].replace(/["`\s]/g, "").toLowerCase();
+                fkByCol.set(fromCol, { toTable, toCol });
+                rels.push({
+                  id: `${tableName}.${fromCol}->${toTable}.${toCol}`,
+                  fromTable: tableName,
+                  fromColumn: fromCol,
+                  toTable,
+                  toColumn: toCol
+                });
+              }
+              return;
+            }
+
+            if (colMatch) {
+              const name = colMatch[2].toLowerCase();
+              const type = colMatch[3].split(/\s+/)[0].replace(/,$/, "").toUpperCase();
+              const isInlinePk = /PRIMARY\s+KEY/i.test(line);
+              if (isInlinePk) pkSet.add(name);
+              columns.push({
+                name,
+                type,
+                isPK: isInlinePk,
+                isFK: false,
+                fk: null
+              });
+            }
+          });
+
+          columns.forEach((c) => {
+            c.isPK = c.isPK || pkSet.has(c.name);
+            if (fkByCol.has(c.name)) {
+              c.isFK = true;
+              c.fk = fkByCol.get(c.name);
+            }
+          });
+
+          tables.push({
+            id: tableName,
+            name: tableName,
+            columns
+          });
+        }
+
+        return { tables, relationships: rels };
+      }
+
+      async function loadDynamicSchemaText() {
+        const candidatePaths = ["../schema.sql", "./schema.sql", "/schema.sql"];
+
+        for (const path of candidatePaths) {
+          try {
+            const res = await fetch(`${path}?t=${Date.now()}`, { cache: "no-store" });
+            if (res.ok) {
+              setStatus(`Loaded schema from ${path}`);
+              return await res.text();
+            }
+          } catch (_err) {
+            // ignore and try next
+          }
+        }
+
+        setStatus("Using embedded schema fallback (file mode). You can still load schema.sql manually.");
+        return document.getElementById("schemaFallback").textContent;
+      }
+
+      function calcTableHeight(table) {
+        const collapsed = state.collapsedTables.has(table.id);
+        const rowCount = collapsed ? layoutCfg.minRowsWhenCollapsed : table.columns.length;
+        return layoutCfg.headHeight + rowCount * layoutCfg.rowHeight + 12;
+      }
+
+      function autoLayout(tables) {
+        const positioned = [];
+        const cols = Math.max(3, Math.ceil(Math.sqrt(tables.length)));
+        const colHeights = new Array(cols).fill(0);
+
+        tables.forEach((table, idx) => {
+          const col = idx % cols;
+          const x = col * (layoutCfg.cardWidth + layoutCfg.colGap);
+          const y = colHeights[col];
+          const height = calcTableHeight(table);
+          colHeights[col] += height + layoutCfg.rowGap;
+          positioned.push({ ...table, x, y, width: layoutCfg.cardWidth, height });
+        });
+
+        return positioned;
+      }
+
+      function rowY(table, colName) {
+        const base = table.y + layoutCfg.headHeight + 18;
+        const idx = table.columns.findIndex((c) => c.name === colName);
+        if (idx < 0) return table.y + table.height / 2;
+        return base + idx * layoutCfg.rowHeight;
+      }
+
+      function connector(from, to) {
+        const fromX = from.x + from.width;
+        const toX = to.x;
+        const fromY = from.y;
+        const toY = to.y;
+        const dx = Math.max(42, Math.abs(toX - fromX) * 0.35);
+        return `M ${fromX} ${fromY} C ${fromX + dx} ${fromY}, ${toX - dx} ${toY}, ${toX} ${toY}`;
+      }
+
+      function clearSvg() {
+        while (ui.viewport.firstChild) ui.viewport.removeChild(ui.viewport.firstChild);
+      }
+
+      function make(tag, attrs) {
+        const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+        Object.entries(attrs || {}).forEach(([k, v]) => el.setAttribute(k, String(v)));
+        return el;
+      }
+
+      function visibleTable(tableId) {
+        if (state.hiddenTables.has(tableId)) return false;
+        if (!state.isolatedTable) return true;
+        if (tableId === state.isolatedTable) return true;
+
+        const linked = state.schema.relationships.some((r) =>
+          (r.fromTable === state.isolatedTable && r.toTable === tableId) ||
+          (r.toTable === state.isolatedTable && r.fromTable === tableId)
+        );
+        return linked;
+      }
+
+      function draw() {
+        if (!state.schema) return;
+        clearSvg();
+
+        const tables = autoLayout(state.schema.tables);
+        const tableMap = new Map(tables.map((t) => [t.id, t]));
+
+        const relLayer = make("g", { class: "rel-layer" });
+        const tableLayer = make("g", { class: "table-layer" });
+
+        state.schema.relationships.forEach((rel) => {
+          const fromTable = tableMap.get(rel.fromTable);
+          const toTable = tableMap.get(rel.toTable);
+          if (!fromTable || !toTable) return;
+
+          const fromVisible = visibleTable(fromTable.id);
+          const toVisible = visibleTable(toTable.id);
+
+          const path = make("path", {
+            class: `relation${(fromVisible && toVisible) ? "" : " hidden"}`,
+            d: connector(
+              { x: fromTable.x, y: rowY(fromTable, rel.fromColumn), width: fromTable.width },
+              { x: toTable.x, y: rowY(toTable, rel.toColumn) }
+            ),
+            "data-from": rel.fromTable,
+            "data-to": rel.toTable,
+            "data-id": rel.id,
+            "marker-end": "url(#arrow)"
+          });
+          path.style.color = "var(--line)";
+          relLayer.appendChild(path);
+
+          const lx = (fromTable.x + fromTable.width + toTable.x) / 2;
+          const ly = (rowY(fromTable, rel.fromColumn) + rowY(toTable, rel.toColumn)) / 2;
+          const label = make("text", {
+            class: `relation-label${(fromVisible && toVisible) ? "" : " hidden"}`,
+            x: lx,
+            y: ly - 5,
+            "text-anchor": "middle"
+          });
+          label.textContent = `${rel.fromColumn} -> ${rel.toColumn}`;
+          relLayer.appendChild(label);
+        });
+
+        tables.forEach((table) => {
+          const isVisible = visibleTable(table.id);
+          const g = make("g", {
+            class: `entity${isVisible ? "" : " hidden"}`,
+            transform: `translate(${table.x}, ${table.y})`,
+            "data-table": table.id
+          });
+
+          const box = make("rect", {
+            class: "entity-box",
+            x: 0,
+            y: 0,
+            width: table.width,
+            height: table.height
+          });
+
+          const head = make("rect", {
+            class: "entity-head",
+            x: 0,
+            y: 0,
+            width: table.width,
+            height: layoutCfg.headHeight
+          });
+
+          const title = make("text", {
+            class: "entity-title",
+            x: 12,
+            y: 23
+          });
+          title.textContent = table.name;
+
+          const collapseMark = make("text", {
+            x: table.width - 16,
+            y: 22,
+            "text-anchor": "middle",
+            fill: "var(--muted)",
+            "font-size": "14"
+          });
+          collapseMark.textContent = state.collapsedTables.has(table.id) ? "+" : "-";
+
+          g.appendChild(box);
+          g.appendChild(head);
+          g.appendChild(title);
+          g.appendChild(collapseMark);
+
+          const collapsed = state.collapsedTables.has(table.id);
+          if (!collapsed) {
+            table.columns.forEach((col, idx) => {
+              const y = layoutCfg.headHeight + 18 + idx * layoutCfg.rowHeight;
+
+              const cName = make("text", { class: "col-text", x: 12, y });
+              cName.textContent = col.name;
+              g.appendChild(cName);
+
+              const cType = make("text", {
+                class: "col-type",
+                x: table.width - 12,
+                y,
+                "text-anchor": "end"
+              });
+              cType.textContent = col.type;
+              g.appendChild(cType);
+
+              if (col.isPK) {
+                const pk = make("text", {
+                  class: "badge",
+                  x: table.width - 65,
+                  y: y,
+                  fill: "var(--pk)"
+                });
+                pk.textContent = "PK";
+                g.appendChild(pk);
+              }
+
+              if (col.isFK) {
+                const fk = make("text", {
+                  class: "badge",
+                  x: table.width - 45,
+                  y: y,
+                  fill: "var(--fk)"
+                });
+                fk.textContent = "FK";
+                g.appendChild(fk);
+              }
+            });
+          }
+
+          g.addEventListener("mouseenter", () => highlightTable(table.id));
+          g.addEventListener("mouseleave", clearHighlight);
+          g.addEventListener("click", () => {
+            if (state.isolatedTable === table.id) {
+              state.isolatedTable = null;
+            } else {
+              state.isolatedTable = table.id;
+            }
+            draw();
+          });
+
+          g.addEventListener("dblclick", (ev) => {
+            ev.preventDefault();
+            if (state.collapsedTables.has(table.id)) {
+              state.collapsedTables.delete(table.id);
+            } else {
+              state.collapsedTables.add(table.id);
+            }
+            draw();
+          });
+
+          tableLayer.appendChild(g);
+        });
+
+        ui.viewport.appendChild(relLayer);
+        ui.viewport.appendChild(tableLayer);
+
+        applyRelationVisibility();
+        applyTransform();
+        buildTableList();
+        setStatus(`Tables: ${state.schema.tables.length}, Relationships: ${state.schema.relationships.length}`);
+      }
+
+      function applyRelationVisibility() {
+        const rels = ui.viewport.querySelectorAll(".relation, .relation-label");
+        rels.forEach((el) => {
+          if (state.hideRelations) el.classList.add("hidden");
+          else el.classList.remove("hidden");
+        });
+      }
+
+      function highlightTable(tableId) {
+        const linkedTableIds = new Set([tableId]);
+        state.schema.relationships.forEach((r) => {
+          if (r.fromTable === tableId) linkedTableIds.add(r.toTable);
+          if (r.toTable === tableId) linkedTableIds.add(r.fromTable);
+        });
+
+        ui.viewport.querySelectorAll(".entity").forEach((el) => {
+          const id = el.getAttribute("data-table");
+          el.classList.toggle("dim", !linkedTableIds.has(id));
+        });
+
+        ui.viewport.querySelectorAll(".relation").forEach((el) => {
+          const f = el.getAttribute("data-from");
+          const t = el.getAttribute("data-to");
+          const active = f === tableId || t === tableId;
+          el.classList.toggle("active", active);
+          el.classList.toggle("dim", !active);
+        });
+      }
+
+      function clearHighlight() {
+        ui.viewport.querySelectorAll(".entity, .relation").forEach((el) => {
+          el.classList.remove("dim", "active");
+        });
+      }
+
+      function buildTableList() {
+        ui.tableList.innerHTML = "";
+
+        const query = ui.search.value.trim().toLowerCase();
+        state.schema.tables
+          .filter((t) => !query || t.name.includes(query))
+          .forEach((t) => {
+            const row = document.createElement("label");
+            row.className = "table-item";
+
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.checked = !state.hiddenTables.has(t.id);
+            checkbox.addEventListener("change", () => {
+              if (checkbox.checked) state.hiddenTables.delete(t.id);
+              else state.hiddenTables.add(t.id);
+              draw();
+            });
+
+            const txt = document.createElement("span");
+            txt.textContent = t.name;
+            txt.style.cursor = "pointer";
+            txt.addEventListener("click", () => {
+              state.isolatedTable = t.id;
+              draw();
+            });
+
+            row.appendChild(checkbox);
+            row.appendChild(txt);
+            ui.tableList.appendChild(row);
+          });
+      }
+
+      function applyTransform() {
+        ui.viewport.setAttribute(
+          "transform",
+          `translate(${state.transform.x}, ${state.transform.y}) scale(${state.transform.k})`
+        );
+        ui.zoomResetBtn.textContent = `${Math.round(state.transform.k * 100)}%`;
+      }
+
+      function zoom(delta, cx, cy) {
+        const k0 = state.transform.k;
+        const k1 = Math.max(0.35, Math.min(2.8, k0 * delta));
+        if (k0 === k1) return;
+
+        const p = ui.svg.createSVGPoint();
+        p.x = cx;
+        p.y = cy;
+        const ctm = ui.viewport.getCTM();
+        if (!ctm) return;
+        const local = p.matrixTransform(ctm.inverse());
+
+        state.transform.k = k1;
+        state.transform.x = cx - local.x * k1;
+        state.transform.y = cy - local.y * k1;
+        applyTransform();
+      }
+
+      function bindPanZoom() {
+        ui.canvasWrap.addEventListener("wheel", (ev) => {
+          ev.preventDefault();
+          const delta = ev.deltaY > 0 ? 0.92 : 1.08;
+          zoom(delta, ev.offsetX, ev.offsetY);
+        }, { passive: false });
+
+        ui.canvasWrap.addEventListener("mousedown", (ev) => {
+          if (ev.button !== 0) return;
+          if (ev.target.closest(".entity")) return;
+          state.drag.active = true;
+          state.drag.x = ev.clientX;
+          state.drag.y = ev.clientY;
+          state.drag.tx = state.transform.x;
+          state.drag.ty = state.transform.y;
+          ui.canvasWrap.classList.add("dragging");
+        });
+
+        window.addEventListener("mousemove", (ev) => {
+          if (!state.drag.active) return;
+          state.transform.x = state.drag.tx + (ev.clientX - state.drag.x);
+          state.transform.y = state.drag.ty + (ev.clientY - state.drag.y);
+          applyTransform();
+        });
+
+        window.addEventListener("mouseup", () => {
+          state.drag.active = false;
+          ui.canvasWrap.classList.remove("dragging");
+        });
+      }
+
+      function bindControls() {
+        ui.search.addEventListener("input", buildTableList);
+
+        ui.showAllBtn.addEventListener("click", () => {
+          state.hiddenTables.clear();
+          draw();
+        });
+
+        ui.hideAllBtn.addEventListener("click", () => {
+          state.schema.tables.forEach((t) => state.hiddenTables.add(t.id));
+          draw();
+        });
+
+        ui.resetFocusBtn.addEventListener("click", () => {
+          state.isolatedTable = null;
+          draw();
+        });
+
+        ui.toggleRelationsBtn.addEventListener("click", () => {
+          state.hideRelations = !state.hideRelations;
+          ui.toggleRelationsBtn.textContent = state.hideRelations ? "Show Relations" : "Hide Relations";
+          applyRelationVisibility();
+        });
+
+        ui.themeBtn.addEventListener("click", () => {
+          state.theme = state.theme === "light" ? "dark" : "light";
+          ui.root.setAttribute("data-theme", state.theme);
+          ui.themeBtn.textContent = state.theme === "light" ? "Dark Mode" : "Light Mode";
+        });
+
+        ui.collapseBtn.addEventListener("click", () => {
+          const allCollapsed = state.collapsedTables.size >= state.schema.tables.length;
+          if (allCollapsed) {
+            state.collapsedTables.clear();
+            ui.collapseBtn.textContent = "Collapse All";
+          } else {
+            state.schema.tables.forEach((t) => state.collapsedTables.add(t.id));
+            ui.collapseBtn.textContent = "Expand All";
+          }
+          draw();
+        });
+
+        ui.zoomInBtn.addEventListener("click", () => zoom(1.12, ui.svg.clientWidth / 2, ui.svg.clientHeight / 2));
+        ui.zoomOutBtn.addEventListener("click", () => zoom(0.88, ui.svg.clientWidth / 2, ui.svg.clientHeight / 2));
+        ui.zoomResetBtn.addEventListener("click", () => {
+          state.transform = { x: 40, y: 28, k: 1 };
+          applyTransform();
+        });
+
+        ui.loadFileBtn.addEventListener("click", () => ui.schemaFileInput.click());
+        ui.schemaFileInput.addEventListener("change", async (ev) => {
+          const file = ev.target.files && ev.target.files[0];
+          if (!file) return;
+          const txt = await file.text();
+          state.schema = parseSchemaFromSQL(txt);
+          draw();
+          setStatus(`Loaded schema from file: ${file.name}`);
+        });
+
+        ui.exportSvgBtn.addEventListener("click", exportSVG);
+        ui.exportPngBtn.addEventListener("click", exportPNG);
+      }
+
+      function exportSVG() {
+        const clone = ui.svg.cloneNode(true);
+        clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+        const data = new XMLSerializer().serializeToString(clone);
+        const blob = new Blob([data], { type: "image/svg+xml;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "er-diagram.svg";
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
+      function exportPNG() {
+        const clone = ui.svg.cloneNode(true);
+        clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+        const data = new XMLSerializer().serializeToString(clone);
+        const svgBlob = new Blob([data], { type: "image/svg+xml;charset=utf-8" });
+        const url = URL.createObjectURL(svgBlob);
+
+        const img = new Image();
+        img.onload = function () {
+          const canvas = document.createElement("canvas");
+          canvas.width = ui.svg.clientWidth * 2;
+          canvas.height = ui.svg.clientHeight * 2;
+          const ctx = canvas.getContext("2d");
+          ctx.scale(2, 2);
+          ctx.fillStyle = getComputedStyle(document.body).backgroundColor || "#ffffff";
+          ctx.fillRect(0, 0, ui.svg.clientWidth, ui.svg.clientHeight);
+          ctx.drawImage(img, 0, 0);
+          const png = canvas.toDataURL("image/png");
+          const a = document.createElement("a");
+          a.href = png;
+          a.download = "er-diagram.png";
+          a.click();
+          URL.revokeObjectURL(url);
+        };
+        img.src = url;
+      }
+
+      async function init() {
+        bindPanZoom();
+        bindControls();
+
+        const sqlText = await loadDynamicSchemaText();
+        state.schema = parseSchemaFromSQL(sqlText);
+
+        if (!state.schema.tables.length) {
+          setStatus("No CREATE TABLE definitions found.");
+          return;
+        }
+
+        draw();
+      }
+
+      init();
+    })();
+  </script>
+</body>
+</html>

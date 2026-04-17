@@ -1,0 +1,270 @@
+{% extends 'user/base.html' %}
+{% block content %}
+<section class="panel">
+    <h2>Skill Matches</h2>
+    <form method="get" class="form-grid inline-form skills-form-card match-filter-form match-filter-inline">
+        <label>Skill
+            <input type="text" name="skill" value="{{ skill_filter if skill_filter is defined else '' }}">
+        </label>
+        <label>Category
+            <div class="category-inline-row" id="matchesCategoryInlineRow">
+                <select name="category" id="matchesCategorySelect">
+                    <option value="">Any</option>
+                    {% for cat in skill_categories %}
+                        <option value="{{ cat }}" {% if category_filter == cat %}selected{% endif %}>{{ cat }}</option>
+                    {% endfor %}
+                </select>
+                <input type="text" id="matchesCustomCategoryInput" placeholder="Enter category" hidden>
+            </div>
+        </label>
+        <label>Level
+            <select name="level">
+                <option value="">Any</option>
+                {% for lvl in skill_levels %}
+                    <option value="{{ lvl }}" {% if level_filter == lvl %}selected{% endif %}>{{ lvl }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Sort
+            <select name="sort">
+                <option value="best" {% if sort_by == 'best' %}selected{% endif %}>Best Match</option>
+                <option value="rating" {% if sort_by == 'rating' %}selected{% endif %}>Rating</option>
+                <option value="availability" {% if sort_by == 'availability' %}selected{% endif %}>Availability</option>
+                <option value="latest" {% if sort_by == 'latest' %}selected{% endif %}>Latest Users</option>
+            </select>
+        </label>
+        <button class="btn match-filter-apply" type="submit">Apply</button>
+    </form>
+
+    {% if matches %}
+        <div class="cards matches-grid">
+            {% for match in matches %}
+                <article class="card match-card">
+                    <div class="match-card-top">
+                        <div class="match-user-block">
+                            <div class="match-avatar" aria-hidden="true">
+                                <img
+                                    src="{{ url_for('static', filename=match.user.profile_image_path) }}"
+                                    alt="@{{ match.user.username }} avatar"
+                                    loading="lazy"
+                                    onerror="this.onerror=null;this.src='{{ url_for('static', filename='images/default-avatar.svg') }}';"
+                                >
+                            </div>
+                            <div class="match-user-meta">
+                                <p class="match-user-sub">
+                                    <a class="user-handle-link" href="{{ url_for('user_profile', username=match.user.username) }}">@{{ match.user.username }}</a>
+                                    <span class="availability-badge availability-{{ match.availability_label|lower }}">{{ match.availability_label }}</span>
+                                    <span class="match-user-rating-inline">
+                                        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
+                                            <path d="M12 2.5l2.9 5.88 6.49.94-4.7 4.58 1.11 6.47L12 17.31 6.2 20.37l1.11-6.47-4.7-4.58 6.49-.94L12 2.5z"></path>
+                                        </svg>
+                                        <span>{% if match.avg_rating is not none %}{{ match.avg_rating }}{% else %}Not rated yet{% endif %}</span>
+                                    </span>
+                                </p>
+                            </div>
+                        </div>
+                        <span class="match-strength-badge">{{ match.strength }}% Match</span>
+                    </div>
+
+                    <form
+                        method="post"
+                        action="{{ url_for('send_request_to_user', user_id=match.user.user_id) }}"
+                        class="form-grid match-request-form match-card-form"
+                        data-skill-component="{{ match.skill_component }}"
+                        data-pair-level-points='{{ match.pair_level_points | tojson }}'
+                        data-valid-requested-by-offered='{{ match.valid_requested_by_offered | tojson }}'
+                        data-valid-offered-by-requested='{{ match.valid_offered_by_requested | tojson }}'
+                    >
+                        <div class="match-skill-row">
+                            <label class="match-skill-field">Your Offered Skill
+                                {% if match.offered_skill_ids|length > 1 %}
+                                    <select name="offered_skill_id" required>
+                                        {% for sid in match.offered_skill_ids %}
+                                            <option value="{{ sid }}" {% if sid == match.default_offered_skill_id %}selected{% endif %}>{{ skill_map[sid].skill_name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                {% else %}
+                                    <input type="hidden" name="offered_skill_id" value="{{ match.default_offered_skill_id }}">
+                                    <span class="match-static-value">{{ skill_map[match.default_offered_skill_id].skill_name }}</span>
+                                {% endif %}
+                            </label>
+                            <span class="match-swap-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+                                    <path d="M7 7h13"></path>
+                                    <path d="M16 3l4 4-4 4"></path>
+                                    <path d="M17 17H4"></path>
+                                    <path d="M8 13l-4 4 4 4"></path>
+                                </svg>
+                            </span>
+                            <label class="match-skill-field">Requested Skill
+                                {% if match.requested_skill_ids|length > 1 %}
+                                    <select name="requested_skill_id" required>
+                                        {% for sid in match.requested_skill_ids %}
+                                            <option value="{{ sid }}" {% if sid == match.default_requested_skill_id %}selected{% endif %}>{{ skill_map[sid].skill_name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                {% else %}
+                                    <input type="hidden" name="requested_skill_id" value="{{ match.default_requested_skill_id }}">
+                                    <span class="match-static-value">{{ skill_map[match.default_requested_skill_id].skill_name }}</span>
+                                {% endif %}
+                            </label>
+                        </div>
+                        <div class="inline-actions match-actions">
+                            <button class="btn" type="submit">Request Exchange</button>
+                            <a class="btn secondary" href="{{ url_for('user_profile', username=match.user.username) }}">View Profile</a>
+                            {% if match.chat_enabled %}
+                                <a class="btn tertiary" href="{{ url_for('messages_thread', username=match.user.username) }}">Chat</a>
+                            {% else %}
+                                <button class="btn tertiary chat-disabled-btn" type="button" disabled aria-disabled="true" title="Chat becomes available after a request is accepted">Chat</button>
+                            {% endif %}
+                        </div>
+                    </form>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">
+            {% if not has_any_skills %}
+                <p>You haven't added any skills yet<br>Add skills to start finding matches</p>
+                <a class="btn" href="{{ url_for('skills') }}">Add Skill</a>
+            {% else %}
+                <p>No matches found</p>
+            {% endif %}
+        </div>
+    {% endif %}
+</section>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const categorySelect = document.getElementById("matchesCategorySelect");
+    const categoryInlineRow = document.getElementById("matchesCategoryInlineRow");
+    const customInput = document.getElementById("matchesCustomCategoryInput");
+
+    if (!categorySelect || !categoryInlineRow || !customInput) {
+        return;
+    }
+
+    function toggleCustomCategory() {
+        const isOther = categorySelect.value === "Other";
+        categoryInlineRow.classList.toggle("show-custom", isOther);
+        customInput.hidden = !isOther;
+        if (!isOther) {
+            customInput.value = "";
+        }
+    }
+
+    categorySelect.addEventListener("change", toggleCustomCategory);
+    toggleCustomCategory();
+
+    function parseJsonData(value) {
+        try {
+            return JSON.parse(value || "{}");
+        } catch (_error) {
+            return {};
+        }
+    }
+
+    function getAllowedSet(mapObj, key) {
+        const values = mapObj && mapObj[key] ? mapObj[key] : [];
+        return new Set(values.map(function (v) { return String(v); }));
+    }
+
+    function filterSelectOptions(selectEl, allowedSet) {
+        if (!selectEl) {
+            return;
+        }
+        Array.from(selectEl.options).forEach(function (option) {
+            option.hidden = allowedSet.size > 0 && !allowedSet.has(option.value);
+        });
+    }
+
+    function firstVisibleOptionValue(selectEl) {
+        const firstVisible = Array.from(selectEl.options).find(function (option) {
+            return !option.hidden;
+        });
+        return firstVisible ? firstVisible.value : "";
+    }
+
+    function updateMatchStrength(form) {
+        const card = form.closest(".match-card");
+        const strengthBadge = card ? card.querySelector(".match-strength-badge") : null;
+        if (!strengthBadge) {
+            return;
+        }
+
+        const offeredInput = form.querySelector('[name="offered_skill_id"]');
+        const requestedInput = form.querySelector('[name="requested_skill_id"]');
+        if (!offeredInput || !requestedInput) {
+            return;
+        }
+
+        const offeredId = String(offeredInput.value || "").trim();
+        const requestedId = String(requestedInput.value || "").trim();
+        const skillComponent = Number(form.dataset.skillComponent || 0);
+        const pairLevelPoints = parseJsonData(form.dataset.pairLevelPoints);
+        const pairPoints = Number(
+            (pairLevelPoints[offeredId] && pairLevelPoints[offeredId][requestedId]) || 0
+        );
+        const strength = Math.max(0, Math.min(100, Math.round(skillComponent + pairPoints)));
+        strengthBadge.textContent = String(strength) + "% Match";
+    }
+
+    function syncLinkedSelects(form, changed) {
+        const offeredSelect = form.querySelector('select[name="offered_skill_id"]');
+        const requestedSelect = form.querySelector('select[name="requested_skill_id"]');
+        if (!offeredSelect || !requestedSelect) {
+            updateMatchStrength(form);
+            return;
+        }
+
+        const validRequestedByOffered = parseJsonData(form.dataset.validRequestedByOffered);
+        const validOfferedByRequested = parseJsonData(form.dataset.validOfferedByRequested);
+
+        if (changed === "offered") {
+            const allowedRequested = getAllowedSet(validRequestedByOffered, String(offeredSelect.value));
+            filterSelectOptions(requestedSelect, allowedRequested);
+            if (requestedSelect.options[requestedSelect.selectedIndex] && requestedSelect.options[requestedSelect.selectedIndex].hidden) {
+                requestedSelect.value = firstVisibleOptionValue(requestedSelect);
+            }
+            const allowedOffered = getAllowedSet(validOfferedByRequested, String(requestedSelect.value));
+            filterSelectOptions(offeredSelect, allowedOffered);
+            if (offeredSelect.options[offeredSelect.selectedIndex] && offeredSelect.options[offeredSelect.selectedIndex].hidden) {
+                offeredSelect.value = firstVisibleOptionValue(offeredSelect);
+            }
+        } else {
+            const allowedOffered = getAllowedSet(validOfferedByRequested, String(requestedSelect.value));
+            filterSelectOptions(offeredSelect, allowedOffered);
+            if (offeredSelect.options[offeredSelect.selectedIndex] && offeredSelect.options[offeredSelect.selectedIndex].hidden) {
+                offeredSelect.value = firstVisibleOptionValue(offeredSelect);
+            }
+            const allowedRequested = getAllowedSet(validRequestedByOffered, String(offeredSelect.value));
+            filterSelectOptions(requestedSelect, allowedRequested);
+            if (requestedSelect.options[requestedSelect.selectedIndex] && requestedSelect.options[requestedSelect.selectedIndex].hidden) {
+                requestedSelect.value = firstVisibleOptionValue(requestedSelect);
+            }
+        }
+
+        updateMatchStrength(form);
+    }
+
+    document.querySelectorAll(".match-card-form").forEach(function (form) {
+        const offeredSelect = form.querySelector('select[name="offered_skill_id"]');
+        const requestedSelect = form.querySelector('select[name="requested_skill_id"]');
+
+        if (offeredSelect) {
+            offeredSelect.addEventListener("change", function () {
+                syncLinkedSelects(form, "offered");
+            });
+        }
+        if (requestedSelect) {
+            requestedSelect.addEventListener("change", function () {
+                syncLinkedSelects(form, "requested");
+            });
+        }
+
+        syncLinkedSelects(form, "offered");
+    });
+});
+</script>
+{% endblock %}
+

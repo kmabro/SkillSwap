@@ -1,0 +1,326 @@
+{% extends 'admin/base_admin.html' %}
+{% block admin_content %}
+<section class="panel">
+    <form id="exchangesFilterForm" method="get" class="form-grid exchanges-filter-form">
+        <label>Search
+            <div class="search-input-wrap">
+                <input id="exchangeSearchInput" type="text" name="q" value="{{ q }}" placeholder="Search by username or skill" autocomplete="off">
+                <button id="clearExchangeSearch" class="search-clear-btn" type="button" aria-label="Clear search" {% if not q %}hidden{% endif %}>x</button>
+            </div>
+        </label>
+        <label>Status
+            <select name="status" id="exchangeStatusSelect">
+                <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All</option>
+                <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
+                <option value="ongoing" {% if status_filter == 'ongoing' %}selected{% endif %}>Ongoing</option>
+                <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>Completed</option>
+                <option value="rejected" {% if status_filter == 'rejected' %}selected{% endif %}>Rejected</option>
+            </select>
+        </label>
+    </form>
+</section>
+
+<section class="panel" id="exchangesResultsPanel">
+    <div class="table-wrap">
+        <table data-enhance="true" data-server-pagination="true">
+            <thead>
+                <tr>
+                    <th>Sender</th>
+                    <th>Receiver</th>
+                    <th>Offered Skill</th>
+                    <th>Requested Skill</th>
+                    <th>Status</th>
+                    <th>Updated At</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for req in exchanges %}
+                    {% set status_key = lifecycle_status_key(req.status) %}
+                    {% set status_label = lifecycle_status_label(req.status) %}
+                    <tr>
+                        <td class="username-col" title="@{{ req.sender.username }}">
+                            <a class="user-link" href="{{ url_for('user_profile', username=req.sender.username) }}" target="_blank" rel="noopener">
+                                <span class="avatar-pill">
+                                    <span class="avatar" aria-hidden="true">
+                                        {% if req.sender.profile_image %}
+                                            <img
+                                                src="{{ url_for('static', filename=req.sender.profile_image_path) }}"
+                                                alt="@{{ req.sender.username }} avatar"
+                                                loading="lazy"
+                                                onerror="this.onerror=null;this.src='{{ url_for('static', filename='images/default-avatar.svg') }}';"
+                                            >
+                                        {% else %}
+                                            {{ req.sender.username[:1] }}
+                                        {% endif %}
+                                    </span>
+                                    <span class="user-label">{{ highlight_text('@' ~ req.sender.username, q) }}</span>
+                                </span>
+                            </a>
+                        </td>
+                        <td class="username-col" title="@{{ req.receiver.username }}">
+                            <a class="user-link" href="{{ url_for('user_profile', username=req.receiver.username) }}" target="_blank" rel="noopener">
+                                <span class="avatar-pill">
+                                    <span class="avatar" aria-hidden="true">
+                                        {% if req.receiver.profile_image %}
+                                            <img
+                                                src="{{ url_for('static', filename=req.receiver.profile_image_path) }}"
+                                                alt="@{{ req.receiver.username }} avatar"
+                                                loading="lazy"
+                                                onerror="this.onerror=null;this.src='{{ url_for('static', filename='images/default-avatar.svg') }}';"
+                                            >
+                                        {% else %}
+                                            {{ req.receiver.username[:1] }}
+                                        {% endif %}
+                                    </span>
+                                    <span class="user-label">{{ highlight_text('@' ~ req.receiver.username, q) }}</span>
+                                </span>
+                            </a>
+                        </td>
+                        <td>{{ highlight_text(req.final_offered_skill.skill_name if req.final_offered_skill else req.offered_skill.skill_name, q) }}</td>
+                        <td>{{ highlight_text(req.final_requested_skill.skill_name if req.final_requested_skill else req.requested_skill.skill_name, q) }}</td>
+                        <td><span class="badge status-{{ status_key }}">{{ status_label }}</span></td>
+                        <td>{{ req.updated_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="6">No exchanges found</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if pagination and pagination.pages > 1 %}
+        <div class="server-pagination">
+            {% if pagination.has_prev %}
+                <a class="btn tiny secondary" href="{{ url_for('admin_exchanges_page', page=pagination.prev_num, q=q, status=status_filter) }}">Prev</a>
+            {% else %}
+                <button class="btn tiny secondary" type="button" disabled>Prev</button>
+            {% endif %}
+            <span>Page {{ pagination.page }} of {{ pagination.pages }}</span>
+            {% if pagination.has_next %}
+                <a class="btn tiny secondary" href="{{ url_for('admin_exchanges_page', page=pagination.next_num, q=q, status=status_filter) }}">Next</a>
+            {% else %}
+                <button class="btn tiny secondary" type="button" disabled>Next</button>
+            {% endif %}
+        </div>
+    {% endif %}
+</section>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    .exchanges-filter-form {
+        grid-template-columns: minmax(260px, 1.8fr) minmax(180px, 1fr);
+        gap: 0.65rem;
+        align-items: end;
+    }
+
+    .search-input-wrap {
+        position: relative;
+    }
+
+    .search-input-wrap input {
+        padding-right: 2rem;
+    }
+
+    .search-clear-btn {
+        position: absolute;
+        right: 0.38rem;
+        top: 50%;
+        transform: translateY(-50%);
+        border: 0;
+        background: transparent;
+        color: #506260;
+        font-size: 1rem;
+        line-height: 1;
+        cursor: pointer;
+        padding: 0.2rem;
+    }
+
+    .search-clear-btn:hover {
+        color: #0f766e;
+    }
+
+    mark.search-hit {
+        background: #fff3b0;
+        border-radius: 3px;
+        padding: 0 2px;
+    }
+
+    #exchangesResultsPanel table {
+        width: 100%;
+        table-layout: fixed;
+    }
+
+    .username-col {
+        max-width: 170px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .username-col .avatar {
+        width: 30px;
+        height: 30px;
+        font-size: 0.72rem;
+    }
+
+    .username-col .avatar-pill {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .username-col .user-link {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        max-width: 100%;
+        overflow: hidden;
+    }
+
+    .username-col .user-label {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .badge.status-pending {
+        background: #fff8eb;
+        color: #945f06;
+        border-color: #f0ddb4;
+    }
+
+    .badge.status-ongoing {
+        background: #e9f0ff;
+        color: #1f4fbf;
+        border-color: #c9d9ff;
+    }
+
+    .badge.status-completed {
+        background: #edf9f2;
+        color: #17603b;
+        border-color: #bde6cb;
+    }
+
+    .badge.status-rejected {
+        background: #fff2f2;
+        color: #a02121;
+        border-color: #f6c8c8;
+    }
+
+    @media (max-width: 900px) {
+        .exchanges-filter-form {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const form = document.getElementById("exchangesFilterForm");
+    const resultsPanel = document.getElementById("exchangesResultsPanel");
+    const searchInput = document.getElementById("exchangeSearchInput");
+    const clearButton = document.getElementById("clearExchangeSearch");
+    const statusSelect = document.getElementById("exchangeStatusSelect");
+
+    if (!form || !resultsPanel || !searchInput || !clearButton || !statusSelect) {
+        return;
+    }
+
+    let debounceTimer = null;
+    let requestId = 0;
+
+    function buildQueryParams() {
+        const params = new URLSearchParams();
+        const q = searchInput.value.trim();
+        if (q) {
+            params.set("q", q);
+        }
+        if (statusSelect.value && statusSelect.value !== "all") {
+            params.set("status", statusSelect.value);
+        }
+        return params;
+    }
+
+    function refreshExchanges(targetUrl, pushHistory) {
+        const currentRequest = ++requestId;
+
+        fetch(targetUrl, {
+            method: "GET",
+            headers: { "X-Requested-With": "XMLHttpRequest" },
+            credentials: "same-origin"
+        })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error("Failed to refresh exchanges list");
+                }
+                return response.text();
+            })
+            .then(function (htmlText) {
+                if (currentRequest !== requestId) {
+                    return;
+                }
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(htmlText, "text/html");
+                const nextPanel = doc.getElementById("exchangesResultsPanel");
+                if (!nextPanel) {
+                    return;
+                }
+                resultsPanel.innerHTML = nextPanel.innerHTML;
+                bindPaginationLinks();
+                if (pushHistory) {
+                    window.history.replaceState({}, "", targetUrl);
+                }
+            })
+            .catch(function () {});
+    }
+
+    function fetchFilteredResults(pushHistory) {
+        const params = buildQueryParams();
+        params.delete("page");
+        const queryString = params.toString();
+        const targetUrl = "{{ url_for('admin_exchanges_page') }}" + (queryString ? ("?" + queryString) : "");
+        refreshExchanges(targetUrl, pushHistory);
+    }
+
+    function scheduleFetch() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(function () {
+            fetchFilteredResults(true);
+        }, 350);
+    }
+
+    function bindPaginationLinks() {
+        resultsPanel.querySelectorAll(".server-pagination a").forEach(function (link) {
+            link.addEventListener("click", function (event) {
+                event.preventDefault();
+                const href = link.getAttribute("href");
+                if (!href) {
+                    return;
+                }
+                refreshExchanges(href, true);
+            });
+        });
+    }
+
+    searchInput.addEventListener("input", function () {
+        const hasValue = searchInput.value.trim().length > 0;
+        clearButton.hidden = !hasValue;
+        scheduleFetch();
+    });
+
+    clearButton.addEventListener("click", function () {
+        searchInput.value = "";
+        clearButton.hidden = true;
+        fetchFilteredResults(true);
+    });
+
+    statusSelect.addEventListener("change", function () {
+        fetchFilteredResults(true);
+    });
+
+    bindPaginationLinks();
+});
+</script>
+{% endblock %}

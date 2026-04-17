@@ -1,0 +1,364 @@
+{% extends 'admin/base_admin.html' %}
+{% block admin_content %}
+<section class="panel">
+    <form id="usersFilterForm" method="get" class="form-grid users-filter-form">
+        <label>Search User
+            <div class="search-input-wrap">
+                <input id="userSearchInput" type="text" name="q" value="{{ q }}" placeholder="Name, username or email" autocomplete="off">
+                <button id="clearUserSearch" class="search-clear-btn" type="button" aria-label="Clear search" {% if not q %}hidden{% endif %}>×</button>
+            </div>
+        </label>
+        <label>Account Status
+            <select name="status">
+                <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All</option>
+                <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+                <option value="blocked" {% if status_filter == 'blocked' %}selected{% endif %}>Blocked</option>
+            </select>
+        </label>
+        <label>Role Filter
+            <select name="role">
+                <option value="all" {% if role_filter == 'all' %}selected{% endif %}>All</option>
+                <option value="user" {% if role_filter == 'user' %}selected{% endif %}>User</option>
+                <option value="admin" {% if role_filter == 'admin' %}selected{% endif %}>Admin</option>
+                <option value="super_admin" {% if role_filter == 'super_admin' %}selected{% endif %}>Super Admin</option>
+            </select>
+        </label>
+    </form>
+</section>
+
+<section class="panel" id="usersResultsPanel">
+    <div class="table-wrap">
+        <table data-enhance="true" data-server-pagination="true">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Account Status</th>
+                    <th>Availability</th>
+                    <th>Total Requests</th>
+                    <th>Completed</th>
+                    <th class="no-sort">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                    <tr>
+                        <td>
+                            <span class="avatar-pill">
+                                <span class="avatar" aria-hidden="true">
+                                    <img
+                                        src="{{ url_for('static', filename=user.profile_image_path) }}"
+                                        alt="@{{ user.username }} avatar"
+                                        loading="lazy"
+                                        onerror="this.onerror=null;this.src='{{ url_for('static', filename='images/default-avatar.svg') }}';"
+                                    >
+                                </span>
+                                <span>
+                                    <strong><a href="{{ url_for('user_profile', username=user.username) }}" target="_blank" rel="noopener">{{ highlight_text('@' ~ user.username, q) }}</a></strong><br>
+                                    <small class="muted">{{ highlight_text(user.name, q) }}</small>
+                                </span>
+                            </span>
+                        </td>
+                        <td>{{ highlight_text(user.email, q) }}</td>
+                        <td>
+                            <span class="badge {% if user.is_super_admin %}role-super-admin{% elif user.is_admin %}role-admin{% else %}role-user{% endif %}">{{ user.role_label }}</span>
+                        </td>
+                        <td>
+                            <span class="badge {% if user.is_blocked %}status-blocked{% else %}status-active{% endif %}">
+                                {{ 'Blocked' if user.is_blocked else 'Active' }}
+                            </span>
+                        </td>
+                        <td>
+                            {% set availability_raw = (user.availability_status or '')|trim %}
+                            {% set availability_label = availability_raw if availability_raw else 'Unknown' %}
+                            {% set availability_key = availability_label|lower|replace(' ', '-') %}
+                            <span class="badge status-{{ availability_key }}">{{ availability_label }}</span>
+                        </td>
+                        <td>{{ user_insights.get(user.user_id, {}).get('total', 0) }}</td>
+                        <td>{{ user_insights.get(user.user_id, {}).get('completed', 0) }}</td>
+                        <td class="actions-cell">
+                            {% if user.is_super_admin %}
+                                <span class="muted">Protected</span>
+                            {% else %}
+                            <div class="inline-actions users-inline-actions">
+                                {% if user.is_blocked %}
+                                    <form method="post" action="{{ url_for('admin_toggle_block_user', user_id=user.user_id) }}">
+                                        <button class="btn tiny secondary" type="submit">Unblock</button>
+                                    </form>
+                                    {% if g.user.is_super_admin %}
+                                        <form method="post" action="{{ url_for('admin_delete_user', user_id=user.user_id) }}" onsubmit="return confirm('Delete this user permanently?');">
+                                            <button class="btn tiny danger" type="submit">Delete</button>
+                                        </form>
+                                    {% endif %}
+                                {% else %}
+                                    <form method="post" action="{{ url_for('admin_toggle_block_user', user_id=user.user_id) }}">
+                                        <button class="btn tiny" type="submit">Block</button>
+                                    </form>
+                                    {% if g.user.is_super_admin and not user.is_admin %}
+                                        <form method="post" action="{{ url_for('admin_promote_user', user_id=user.user_id) }}">
+                                            <button class="btn tiny secondary" type="submit">Promote</button>
+                                        </form>
+                                    {% endif %}
+                                    {% if g.user.is_super_admin and user.is_admin and user.user_id != g.user.user_id and not user.is_super_admin %}
+                                        <form method="post" action="{{ url_for('admin_demote_user', user_id=user.user_id) }}" onsubmit="return confirm('Remove admin role from this user?');">
+                                            <button class="btn tiny danger" type="submit">Demote</button>
+                                        </form>
+                                    {% endif %}
+                                    {% if g.user.is_super_admin and not user.is_admin %}
+                                        <form method="post" action="{{ url_for('admin_delete_user', user_id=user.user_id) }}" onsubmit="return confirm('Delete this user permanently?');">
+                                            <button class="btn tiny danger" type="submit">Delete</button>
+                                        </form>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="8">No users found</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if pagination and pagination.pages > 1 %}
+        <div class="server-pagination">
+            {% if pagination.has_prev %}
+                <a class="btn tiny secondary" href="{{ url_for('admin_users_page', page=pagination.prev_num, q=q, status=status_filter, role=role_filter) }}">Prev</a>
+            {% else %}
+                <button class="btn tiny secondary" type="button" disabled>Prev</button>
+            {% endif %}
+            <span>Page {{ pagination.page }} of {{ pagination.pages }}</span>
+            {% if pagination.has_next %}
+                <a class="btn tiny secondary" href="{{ url_for('admin_users_page', page=pagination.next_num, q=q, status=status_filter, role=role_filter) }}">Next</a>
+            {% else %}
+                <button class="btn tiny secondary" type="button" disabled>Next</button>
+            {% endif %}
+        </div>
+    {% endif %}
+</section>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    .users-filter-form {
+        grid-template-columns: minmax(260px, 1.8fr) repeat(2, minmax(170px, 1fr));
+        gap: 0.65rem;
+        align-items: end;
+    }
+
+    .search-input-wrap {
+        position: relative;
+    }
+
+    .search-input-wrap input {
+        padding-right: 2rem;
+    }
+
+    .search-clear-btn {
+        position: absolute;
+        right: 0.38rem;
+        top: 50%;
+        transform: translateY(-50%);
+        border: 0;
+        background: transparent;
+        color: #506260;
+        font-size: 1rem;
+        line-height: 1;
+        cursor: pointer;
+        padding: 0.2rem;
+    }
+
+    .search-clear-btn:hover {
+        color: #0f766e;
+    }
+
+    .badge.role-super-admin {
+        background: #efe8ff;
+        color: #5f2bc5;
+        border-color: #d8c8ff;
+    }
+
+    mark.search-hit {
+        background: #fff3b0;
+        border-radius: 3px;
+        padding: 0 2px;
+    }
+
+    .actions-cell {
+        white-space: nowrap;
+        min-width: 250px;
+    }
+
+    .users-inline-actions {
+        display: inline-flex;
+        flex-wrap: nowrap;
+        gap: 0.35rem;
+        align-items: center;
+        width: auto;
+    }
+
+    .users-inline-actions form {
+        margin: 0;
+    }
+
+    .users-inline-actions .btn {
+        height: 30px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        white-space: nowrap;
+        width: auto;
+    }
+
+    .avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+
+    @media (max-width: 900px) {
+        .users-filter-form {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const form = document.getElementById("usersFilterForm");
+    const resultsPanel = document.getElementById("usersResultsPanel");
+    const searchInput = document.getElementById("userSearchInput");
+    const clearButton = document.getElementById("clearUserSearch");
+    if (!form || !resultsPanel || !searchInput || !clearButton) {
+        return;
+    }
+
+    const statusSelect = form.querySelector("select[name='status']");
+    const roleSelect = form.querySelector("select[name='role']");
+    let debounceTimer = null;
+    let requestId = 0;
+
+    function buildQueryParams() {
+        const params = new URLSearchParams();
+        const q = searchInput.value.trim();
+        if (q) {
+            params.set("q", q);
+        }
+        if (statusSelect && statusSelect.value && statusSelect.value !== "all") {
+            params.set("status", statusSelect.value);
+        }
+        if (roleSelect && roleSelect.value && roleSelect.value !== "all") {
+            params.set("role", roleSelect.value);
+        }
+        return params;
+    }
+
+    function refreshUsers(targetUrl, pushHistory) {
+        const currentRequest = ++requestId;
+
+        fetch(targetUrl, {
+            method: "GET",
+            headers: { "X-Requested-With": "XMLHttpRequest" },
+            credentials: "same-origin"
+        })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error("Failed to refresh users list");
+                }
+                return response.text();
+            })
+            .then(function (htmlText) {
+                if (currentRequest !== requestId) {
+                    return;
+                }
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(htmlText, "text/html");
+                const nextPanel = doc.getElementById("usersResultsPanel");
+                if (!nextPanel) {
+                    return;
+                }
+                resultsPanel.innerHTML = nextPanel.innerHTML;
+                bindPaginationLinks();
+                if (pushHistory) {
+                    window.history.replaceState({}, "", targetUrl);
+                }
+            })
+            .catch(function () {});
+    }
+
+    function fetchFilteredResults(pushHistory) {
+        const params = buildQueryParams();
+        params.delete("page");
+        const queryString = params.toString();
+        const targetUrl = "{{ url_for('admin_users_page') }}" + (queryString ? ("?" + queryString) : "");
+        refreshUsers(targetUrl, pushHistory);
+    }
+
+    function scheduleFetch() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(function () {
+            fetchFilteredResults(true);
+        }, 400);
+    }
+
+    function resetToAllAndFetch() {
+        searchInput.value = "";
+        if (statusSelect) {
+            statusSelect.value = "all";
+        }
+        if (roleSelect) {
+            roleSelect.value = "all";
+        }
+        clearButton.hidden = true;
+        fetchFilteredResults(true);
+    }
+
+    function bindPaginationLinks() {
+        resultsPanel.querySelectorAll(".server-pagination a").forEach(function (link) {
+            link.addEventListener("click", function (event) {
+                event.preventDefault();
+                const href = link.getAttribute("href");
+                if (!href) {
+                    return;
+                }
+                refreshUsers(href, true);
+            });
+        });
+    }
+
+    searchInput.addEventListener("input", function () {
+        const hasValue = searchInput.value.trim().length > 0;
+        clearButton.hidden = !hasValue;
+        if (!hasValue) {
+            resetToAllAndFetch();
+            return;
+        }
+        scheduleFetch();
+    });
+
+    clearButton.addEventListener("click", function () {
+        resetToAllAndFetch();
+    });
+
+    if (statusSelect) {
+        statusSelect.addEventListener("change", function () {
+            fetchFilteredResults(true);
+        });
+    }
+
+    if (roleSelect) {
+        roleSelect.addEventListener("change", function () {
+            fetchFilteredResults(true);
+        });
+    }
+
+    bindPaginationLinks();
+});
+</script>
+{% endblock %}
