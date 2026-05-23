@@ -1832,7 +1832,16 @@ def sync_schema_and_admin():
         skill.category_id = category_lookup.get(category_name.lower(), uncategorized.category_id)
         skill.category = category_name
 
-    if db.engine.dialect.name != "sqlite":
+    if db.engine.dialect.name == "sqlite":
+        db.session.execute(
+            text(
+                "INSERT OR IGNORE INTO user_skills (user_id, skill_id) "
+                "SELECT user_id, skill_id FROM user_skills_offered "
+                "UNION "
+                "SELECT user_id, skill_id FROM user_skills_wanted"
+            )
+        )
+    else:
         db.session.execute(
             text(
                 "INSERT INTO user_skills (user_id, skill_id) "
