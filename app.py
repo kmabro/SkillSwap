@@ -10,7 +10,11 @@ import re
 import secrets
 import string
 import uuid
-import requests
+try:
+    import requests
+except Exception:
+    requests = None
+    logging.warning("Optional dependency 'requests' not installed. HTTP features will be disabled until installed.")
 from collections import defaultdict, deque
 from threading import Lock
 from urllib import parse, request as urllib_request
