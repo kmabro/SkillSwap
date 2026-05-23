@@ -10,11 +10,7 @@ import re
 import secrets
 import string
 import uuid
-try:
-    import requests
-except Exception:
-    requests = None
-    logging.warning("Optional dependency 'requests' not installed. HTTP features will be disabled until installed.")
+import requests
 from collections import defaultdict, deque
 from threading import Lock
 from urllib import parse, request as urllib_request
@@ -1836,15 +1832,16 @@ def sync_schema_and_admin():
         skill.category_id = category_lookup.get(category_name.lower(), uncategorized.category_id)
         skill.category = category_name
 
-    db.session.execute(
-        text(
-            "INSERT INTO user_skills (user_id, skill_id) "
-            "SELECT user_id, skill_id FROM user_skills_offered "
-            "UNION "
-            "SELECT user_id, skill_id FROM user_skills_wanted "
-            "ON DUPLICATE KEY UPDATE skill_id = VALUES(skill_id)"
+    if db.engine.dialect.name != "sqlite":
+        db.session.execute(
+            text(
+                "INSERT INTO user_skills (user_id, skill_id) "
+                "SELECT user_id, skill_id FROM user_skills_offered "
+                "UNION "
+                "SELECT user_id, skill_id FROM user_skills_wanted "
+                "ON DUPLICATE KEY UPDATE skill_id = VALUES(skill_id)"
+            )
         )
-    )
     db.session.execute(
         text(
             "UPDATE users "
