@@ -1606,9 +1606,10 @@ def sync_schema_and_admin():
         db.session.execute(text("ALTER TABLE requests ADD COLUMN session_sender_last_ping_at DATETIME NULL"))
     if "session_receiver_last_ping_at" not in request_columns:
         db.session.execute(text("ALTER TABLE requests ADD COLUMN session_receiver_last_ping_at DATETIME NULL"))
-    db.session.execute(
-        text("ALTER TABLE requests MODIFY COLUMN status VARCHAR(40) NOT NULL DEFAULT 'pending'")
-    )
+    if db.engine.dialect.name != "sqlite":
+        db.session.execute(
+            text("ALTER TABLE requests MODIFY COLUMN status VARCHAR(40) NOT NULL DEFAULT 'pending'")
+        )
     if "exchange_request_id" not in rating_columns:
         db.session.execute(text("ALTER TABLE ratings ADD COLUMN exchange_request_id INTEGER NULL"))
 
